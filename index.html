@@ -1345,8 +1345,10 @@ function handleSend() {
   const chat = chats.find(c => c.id === activeChatId);
 
   if (chat.id === 'live') {
-    // Real Firebase-backed room
-    const roomId = document.getElementById('room-input').value.trim() || 'demo-room';
+    // Real Firebase-backed room — use whichever room we're actually
+    // connected to (set by connectToRoom), not the manual bar's input,
+    // since account/find-user logins connect without touching that field.
+    const roomId = currentRoomId || document.getElementById('room-input').value.trim() || 'demo-room';
     sendToFirebase(roomId, text);
   } else {
     // Local demo chat — just echo into the UI
@@ -1384,7 +1386,7 @@ fileInput.addEventListener('change', async () => {
   const chat = chats.find(c => c.id === activeChatId);
   if (chat.id !== 'live') return; // media only supported on the live Firebase room
 
-  const roomId = document.getElementById('room-input').value.trim() || 'demo-room';
+  const roomId = currentRoomId || document.getElementById('room-input').value.trim() || 'demo-room';
   const isVideo = file.type.startsWith('video/');
   const kind = isVideo ? 'video' : 'image';
 
@@ -1446,7 +1448,7 @@ async function startRecording() {
 
     const durationSec = (Date.now() - recordStartTime) / 1000;
     const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
-    const roomId = document.getElementById('room-input').value.trim() || 'demo-room';
+    const roomId = currentRoomId || document.getElementById('room-input').value.trim() || 'demo-room';
     sendMediaToFirebase(roomId, 'voice', blob, blob.type, durationSec);
   };
 
