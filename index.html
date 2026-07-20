@@ -722,45 +722,44 @@ async function decryptBytes(key, ivB64, cipherBuf) {
 }
 
 /* ======================================================================
-   CATBOX.MOE — free anonymous file host used as "blind" storage.
+   LITTERBOX (catbox.moe's temporary-upload service) — "blind", 
+   self-expiring storage. Every uploaded file is auto-deleted by
+   Litterbox itself 72 hours after upload — nothing to clean up on our
+   side, and old media doesn't linger indefinitely.
    ----------------------------------------------------------------------
    We NEVER upload a real photo/video/voice note in the clear. The file
    is AES-GCM-encrypted on-device first (see encryptBytes above), and
-   only that unreadable ciphertext blob is sent to Catbox. Catbox just
-   sees random bytes and hands back a direct URL to them — it has no
-   way to know it's hosting a photo, a video, or anything else. The
-   URL itself is then also encrypted before it's written to Firestore,
-   so the database never reveals which Catbox links belong to a room.
+   only that unreadable ciphertext blob is sent out. The host just sees
+   random bytes and hands back a direct URL to them — it has no way to
+   know it's hosting a photo, a video, or anything else. The URL itself
+   is then also encrypted before it's written to Firestore, so the
+   database never reveals which links belong to a room.
    ====================================================================== */
-// Catbox's API endpoint sends no Access-Control-Allow-Origin header, so a
-// direct fetch() from a browser page hosted elsewhere is blocked by CORS
-// before the request even leaves the client (shows up as a generic
-// "Failed to fetch" TypeError). Try the direct request first (works when
-// the page is opened from file:// or in setups where the browser allows
-// it), then fall back through a couple of free CORS proxies so the
-// upload actually reaches Catbox from a normal browser tab.
-const CATBOX_ENDPOINT = 'https://catbox.moe/user/api.php';
-
-// Your own Cloudflare Worker acting as a CORS-safe reverse proxy in front of
-// Catbox. This is the reliable path — public proxies below are flaky (rate
-// limits, 403s, broken POST handling) and only kept as a last-resort chain.
-// 1) Deploy worker.js (see accompanying file) to Cloudflare Workers (free).
-// 2) Paste the resulting *.workers.dev URL below.
-// 3) Leave it as '' to skip straight to the direct request / public proxies.
-const CATBOX_WORKER_PROXY = 'https://twilight-lab-2a73.zenakozub-ua.workers.dev';
-
-const CATBOX_CORS_FALLBACKS = [
-  url => 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url),
-  url => 'https://thingproxy.freeboard.io/fetch/' + url,
+// Litterbox's API sends no Access-Control-Allow-Origin header, so a direct
+// fetch() from a browser page hosted elsewhere is blocked by CORS before
+// the request even leaves the client (shows up as a generic "Failed to
+// fetch" TypeError). Fill in WORKER_PROXY_URL with your deployed
+// Cloudflare Worker (see worker.js) — it forwards the upload to Litterbox
+// server-side with the right CORS headers AND forces 72h expiry, so a
+// tampered client can't sneak a longer/shorter retention window through.
+// If left empty, the code below falls back to a direct request (works
+// from file:// or permissive setups) and then a couple of free public
+// CORS proxies as a last resort — both less reliable than the worker.
+const WORKER_PROXY_URL = ''; // e.g. 'https://litterbox-proxy.yourname.workers.dev'
+const LITTERBOX_ENDPOINT = 'https://litterbox.catbox.moe/resources/internals/api.php';
+const LITTERBOX_EXPIRY = '72h'; // only used on the direct/fallback paths — the worker forces this itself
+const LITTERBOX_CORS_FALLBACKS = [
   url => 'https://corsproxy.io/?url=' + encodeURIComponent(url),
   url => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
+  url => 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url),
+  url => 'https://thingproxy.freeboard.io/fetch/' + url,
 ];
 
 async function uploadEncryptedBlobToCatbox(blob) {
   const attempts = [
-    ...(CATBOX_WORKER_PROXY ? [CATBOX_WORKER_PROXY] : []),
-    CATBOX_ENDPOINT,
-    ...CATBOX_CORS_FALLBACKS.map(f => f(CATBOX_ENDPOINT)),
+    ...(WORKER_PROXY_URL ? [WORKER_PROXY_URL] : []),
+    LITTERBOX_ENDPOINT,
+    ...LITTERBOX_CORS_FALLBACKS.map(f => f(LITTERBOX_ENDPOINT)),
   ];
   let lastErr = null;
 
@@ -768,9 +767,10 @@ async function uploadEncryptedBlobToCatbox(blob) {
     try {
       const formData = new FormData();
       formData.append('reqtype', 'fileupload');
+      formData.append('time', LITTERBOX_EXPIRY); // ignored by the worker (it forces its own), used on direct/proxy paths
       // Generic extension — the real mime type is stored separately (see
       // message doc's `mime` field) and used to rebuild the file after
-      // decryption; Catbox itself never needs to know what it is.
+      // decryption; the host itself never needs to know what it is.
       formData.append('fileToUpload', blob, 'blob.enc');
       const resp = await fetch(endpoint, { method: 'POST', body: formData });
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
@@ -778,11 +778,11 @@ async function uploadEncryptedBlobToCatbox(blob) {
       if (!url.startsWith('http')) throw new Error('unexpected response: ' + url.slice(0, 200));
       return url;
     } catch (e) {
-      console.warn('Catbox upload attempt failed via', endpoint, '→', e.message || e);
+      console.warn('Litterbox upload attempt failed via', endpoint, '→', e.message || e);
       lastErr = e;
     }
   }
-  throw new Error('Catbox upload failed (all routes exhausted): ' + (lastErr?.message || lastErr));
+  throw new Error('Litterbox upload failed (all routes exhausted): ' + (lastErr?.message || lastErr));
 }
 
 // Downscales/recompresses an image client-side via <canvas> before it's
