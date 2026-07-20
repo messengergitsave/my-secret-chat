@@ -732,21 +732,44 @@ async function decryptBytes(key, ivB64, cipherBuf) {
    URL itself is then also encrypted before it's written to Firestore,
    so the database never reveals which Catbox links belong to a room.
    ====================================================================== */
+// Catbox's API endpoint sends no Access-Control-Allow-Origin header, so a
+// direct fetch() from a browser page hosted elsewhere is blocked by CORS
+// before the request even leaves the client (shows up as a generic
+// "Failed to fetch" TypeError). Try the direct request first (works when
+// the page is opened from file:// or in setups where the browser allows
+// it), then fall back through a couple of free CORS proxies so the
+// upload actually reaches Catbox from a normal browser tab.
+const CATBOX_ENDPOINT = 'https://catbox.moe/user/api.php';
+const CATBOX_CORS_FALLBACKS = [
+  url => 'https://corsproxy.io/?url=' + encodeURIComponent(url),
+  url => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
+  url => 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url),
+  url => 'https://thingproxy.freeboard.io/fetch/' + url,
+];
+
 async function uploadEncryptedBlobToCatbox(blob) {
-  const formData = new FormData();
-  formData.append('reqtype', 'fileupload');
-  // Generic extension — the real mime type is stored separately (see
-  // message doc's `mime` field) and used to rebuild the file after
-  // decryption; Catbox itself never needs to know what it is.
-  formData.append('fileToUpload', blob, 'blob.enc');
-  const resp = await fetch('https://catbox.moe/user/api.php', {
-    method: 'POST',
-    body: formData
-  });
-  if (!resp.ok) throw new Error('Catbox upload failed: ' + resp.status);
-  const url = (await resp.text()).trim();
-  if (!url.startsWith('http')) throw new Error('Catbox returned unexpected response: ' + url);
-  return url;
+  const attempts = [CATBOX_ENDPOINT, ...CATBOX_CORS_FALLBACKS.map(f => f(CATBOX_ENDPOINT))];
+  let lastErr = null;
+
+  for (const endpoint of attempts) {
+    try {
+      const formData = new FormData();
+      formData.append('reqtype', 'fileupload');
+      // Generic extension — the real mime type is stored separately (see
+      // message doc's `mime` field) and used to rebuild the file after
+      // decryption; Catbox itself never needs to know what it is.
+      formData.append('fileToUpload', blob, 'blob.enc');
+      const resp = await fetch(endpoint, { method: 'POST', body: formData });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const url = (await resp.text()).trim();
+      if (!url.startsWith('http')) throw new Error('unexpected response: ' + url.slice(0, 200));
+      return url;
+    } catch (e) {
+      console.warn('Catbox upload attempt failed via', endpoint, '→', e.message || e);
+      lastErr = e;
+    }
+  }
+  throw new Error('Catbox upload failed (all routes exhausted): ' + (lastErr?.message || lastErr));
 }
 
 // Downscales/recompresses an image client-side via <canvas> before it's
@@ -899,7 +922,7 @@ async function sendMediaToFirebase(roomId, kind, fileBlob, mime, duration = 0) {
     });
     setConnStatus(true, '🔒 Encrypted · room: ' + roomId);
   } catch (e) {
-    console.error("Media send failed:", e);
+    console.error("Media send failed:", e.message || e);
     setConnStatus(false, 'Не удалось отправить файл (проверь интернет/Catbox)');
   }
 }
