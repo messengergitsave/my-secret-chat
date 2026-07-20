@@ -740,15 +740,28 @@ async function decryptBytes(key, ivB64, cipherBuf) {
 // it), then fall back through a couple of free CORS proxies so the
 // upload actually reaches Catbox from a normal browser tab.
 const CATBOX_ENDPOINT = 'https://catbox.moe/user/api.php';
+
+// Your own Cloudflare Worker acting as a CORS-safe reverse proxy in front of
+// Catbox. This is the reliable path — public proxies below are flaky (rate
+// limits, 403s, broken POST handling) and only kept as a last-resort chain.
+// 1) Deploy worker.js (see accompanying file) to Cloudflare Workers (free).
+// 2) Paste the resulting *.workers.dev URL below.
+// 3) Leave it as '' to skip straight to the direct request / public proxies.
+const CATBOX_WORKER_PROXY = 'https://twilight-lab-2a73.zenakozub-ua.workers.dev';
+
 const CATBOX_CORS_FALLBACKS = [
-  url => 'https://corsproxy.io/?url=' + encodeURIComponent(url),
-  url => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
   url => 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url),
   url => 'https://thingproxy.freeboard.io/fetch/' + url,
+  url => 'https://corsproxy.io/?url=' + encodeURIComponent(url),
+  url => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
 ];
 
 async function uploadEncryptedBlobToCatbox(blob) {
-  const attempts = [CATBOX_ENDPOINT, ...CATBOX_CORS_FALLBACKS.map(f => f(CATBOX_ENDPOINT))];
+  const attempts = [
+    ...(CATBOX_WORKER_PROXY ? [CATBOX_WORKER_PROXY] : []),
+    CATBOX_ENDPOINT,
+    ...CATBOX_CORS_FALLBACKS.map(f => f(CATBOX_ENDPOINT)),
+  ];
   let lastErr = null;
 
   for (const endpoint of attempts) {
