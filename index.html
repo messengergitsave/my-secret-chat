@@ -411,7 +411,6 @@
     padding: 6px 10px;
     min-width: 220px;
   }
-  .voice-note-icon{ font-size:16px; line-height:1; margin-right:2px; flex-shrink:0; }
   .voice-play-btn{
     width: 36px; height:36px;
     border-radius:50%;
@@ -518,11 +517,137 @@
   @media (min-width: 769px){
     #back-btn{ display:none; }
   }
+
+  /* ================= AUTH / FIND-USER OVERLAYS ================= */
+  #auth-overlay, #finduser-overlay, #unlock-overlay{
+    position:fixed; inset:0; z-index:50;
+    background:rgba(0,0,0,.55);
+    display:flex; align-items:center; justify-content:center;
+    padding:16px;
+  }
+  #auth-overlay.hidden, #finduser-overlay.hidden, #unlock-overlay.hidden{ display:none; }
+  #auth-box, #finduser-box, #unlock-box{
+    width:100%; max-width:340px;
+    background: var(--bg-secondary, #17212b);
+    border-radius:12px;
+    padding:24px;
+    box-shadow:0 10px 40px rgba(0,0,0,.4);
+    position:relative;
+  }
+  .auth-sep{ border:none; border-top:1px solid rgba(255,255,255,.1); margin:4px 0; }
+  #unlock-title{ font-weight:600; font-size:16px; margin-bottom:6px; }
+  #unlock-sub{ font-size:13px; color:var(--text-secondary,#8a9ba8); margin-bottom:14px; line-height:1.4; }
+  #unlock-sub span{ color:inherit; font-weight:600; }
+  #auth-tabs{ display:flex; gap:8px; margin-bottom:16px; }
+  .auth-tab{
+    flex:1; padding:8px; border:none; border-radius:8px; cursor:pointer;
+    background:transparent; color:var(--text-secondary,#8a9ba8); font-weight:600;
+  }
+  .auth-tab.active{ background:var(--accent,#4d76a3); color:#fff; }
+  .auth-form{ display:flex; flex-direction:column; gap:10px; }
+  .auth-form input{
+    padding:10px 12px; border-radius:8px; border:1px solid rgba(255,255,255,.1);
+    background:rgba(255,255,255,.05); color:inherit; font-size:14px;
+  }
+  .auth-form button{
+    padding:10px; border:none; border-radius:8px; background:var(--accent,#4d76a3);
+    color:#fff; font-weight:600; cursor:pointer;
+  }
+  .auth-error{ color:#e57373; font-size:13px; min-height:16px; }
+  #auth-note{ margin-top:14px; font-size:12px; color:var(--text-secondary,#8a9ba8); line-height:1.4; }
+
+  #finduser-close{
+    position:absolute; top:10px; right:10px; border:none; background:transparent;
+    color:var(--text-secondary,#8a9ba8); font-size:16px; cursor:pointer;
+  }
+  #finduser-profile{ display:flex; flex-direction:column; align-items:center; gap:8px; margin-top:16px; }
+  #finduser-avatar{ width:56px; height:56px; border-radius:50%; display:flex; align-items:center;
+    justify-content:center; font-size:22px; background:linear-gradient(135deg,#7c6ce0,#4d76a3); }
+  #finduser-nickname{ font-weight:600; }
+  #finduser-handle-label{ font-size:13px; color:var(--text-secondary,#8a9ba8); }
+  #finduser-password{ width:100%; box-sizing:border-box; padding:10px 12px; border-radius:8px;
+    border:1px solid rgba(255,255,255,.1); background:rgba(255,255,255,.05); color:inherit; }
+  #finduser-enter-btn{ width:100%; padding:10px; border:none; border-radius:8px;
+    background:var(--accent,#4d76a3); color:#fff; font-weight:600; cursor:pointer; }
+
+  #account-label{ font-size:13px; color:var(--text-secondary,#8a9ba8); white-space:nowrap; padding:0 4px; }
 </style>
 </head>
 <body>
 
 <div id="app">
+
+  <!-- ================= AUTH OVERLAY (register / login) ================= -->
+  <div id="auth-overlay">
+    <div id="auth-box">
+      <div id="auth-tabs">
+        <button class="auth-tab active" id="auth-tab-login">Вход</button>
+        <button class="auth-tab" id="auth-tab-register">Регистрация</button>
+      </div>
+
+      <form id="login-form" class="auth-form">
+        <input type="text" id="login-handle" placeholder="@handle" autocomplete="username" required>
+        <input type="password" id="login-password" placeholder="Пароль аккаунта" autocomplete="current-password" required>
+        <button type="submit">Войти</button>
+        <div class="auth-error" id="login-error"></div>
+      </form>
+
+      <form id="register-form" class="auth-form" style="display:none;">
+        <input type="text" id="register-handle" placeholder="@handle (a-z, 0-9, _)" autocomplete="username" required>
+        <input type="text" id="register-nickname" placeholder="Отображаемое имя" required>
+        <input type="password" id="register-password" placeholder="Пароль аккаунта" autocomplete="new-password" required>
+        <input type="password" id="register-password2" placeholder="Повторите пароль аккаунта" autocomplete="new-password" required>
+        <hr class="auth-sep">
+        <input type="password" id="register-chatpassword" placeholder="Пароль для чата (шифрование)" autocomplete="new-password" required>
+        <input type="password" id="register-chatpassword2" placeholder="Повторите пароль для чата" autocomplete="new-password" required>
+        <button type="submit">Создать аккаунт</button>
+        <div class="auth-error" id="register-error"></div>
+      </form>
+
+      <div id="auth-note">
+        Это два разных пароля: <b>пароль аккаунта</b> — только для входа,
+        <b>пароль чата</b> — используется для сквозного шифрования (AES-GCM)
+        ваших сообщений. Ни то, ни другое не хранится у нас — оба
+        восстановить нельзя, если забыть.
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= UNLOCK CHAT OVERLAY (enter chat password after login) ================= -->
+  <div id="unlock-overlay" style="display:none;">
+    <div id="unlock-box">
+      <div id="unlock-title">Разблокировать чат</div>
+      <div id="unlock-sub">Вы вошли как <span id="unlock-handle"></span>. Введите пароль чата, чтобы расшифровать сообщения.</div>
+      <form id="unlock-form" class="auth-form">
+        <input type="password" id="unlock-password" placeholder="Пароль для чата" autocomplete="current-password" required>
+        <button type="submit">Разблокировать</button>
+        <div class="auth-error" id="unlock-error"></div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= FIND USER / PROFILE OVERLAY ================= -->
+
+  <div id="finduser-overlay" style="display:none;">
+    <div id="finduser-box">
+      <button id="finduser-close" title="Закрыть">✕</button>
+
+      <form id="finduser-form" class="auth-form">
+        <input type="text" id="finduser-handle" placeholder="Найти по @handle" required>
+        <button type="submit">Искать</button>
+      </form>
+      <div class="auth-error" id="finduser-error"></div>
+
+      <div id="finduser-profile" style="display:none;">
+        <div class="avatar" id="finduser-avatar">?</div>
+        <div id="finduser-nickname"></div>
+        <div id="finduser-handle-label"></div>
+        <input type="password" id="finduser-password" placeholder="Пароль чата этого пользователя">
+        <button id="finduser-enter-btn">Открыть чат</button>
+        <div class="auth-error" id="finduser-enter-error"></div>
+      </div>
+    </div>
+  </div>
 
   <!-- ================= SIDEBAR ================= -->
   <div id="sidebar">
@@ -534,6 +659,13 @@
         <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.7.7l.27.28v.79l5 5L20.49 19l-5-5zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14z"/></svg>
         <input type="text" id="search-input" placeholder="Search">
       </div>
+      <button class="icon-btn" id="finduser-btn" title="Найти пользователя по @handle">
+        <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.7.7l.27.28v.79l5 5L20.49 19l-5-5zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14z"/></svg>
+      </button>
+      <span id="account-label"></span>
+      <button class="icon-btn" id="logout-btn" title="Выйти" style="display:none;">
+        <svg viewBox="0 0 24 24"><path d="M16 13v-2H7V8l-5 4 5 4v-3zM20 3H9c-1.1 0-2 .9-2 2v4h2V5h11v14H9v-4H7v4c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg>
+      </button>
     </div>
     <div id="chat-list"></div>
     <button id="fab-new-chat" title="New chat">
@@ -566,7 +698,7 @@
       <button class="icon-btn" id="attach-btn" title="Прикрепить фото/видео">
         <svg viewBox="0 0 24 24"><path d="M16.5 6v11.5a4 4 0 0 1-8 0V5a2.5 2.5 0 0 1 5 0v10.5a1 1 0 0 1-2 0V6H10v9.5a2.5 2.5 0 0 0 5 0V5a4 4 0 0 0-8 0v12.5a5.5 5.5 0 0 0 11 0V6z"/></svg>
       </button>
-      <input type="file" id="file-input" accept="image/*,video/*,audio/*" style="display:none">
+      <input type="file" id="file-input" accept="image/*,video/*" style="display:none">
       <textarea id="message-input" placeholder="Write a message..." rows="1"></textarea>
       <button class="icon-btn" id="mic-btn" title="Голосовое сообщение">
         <svg viewBox="0 0 24 24"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11z"/></svg>
@@ -613,7 +745,8 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getFirestore, collection, addDoc, query, orderBy,
-  onSnapshot, serverTimestamp, limit
+  onSnapshot, serverTimestamp, limit,
+  doc, getDoc, setDoc, deleteDoc
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // PASTE YOUR OWN CONFIG HERE ⬇⬇⬇
@@ -723,44 +856,45 @@ async function decryptBytes(key, ivB64, cipherBuf) {
 }
 
 /* ======================================================================
-   LITTERBOX (catbox.moe's temporary-upload service) — "blind", 
-   self-expiring storage. Every uploaded file is auto-deleted by
-   Litterbox itself 72 hours after upload — nothing to clean up on our
-   side, and old media doesn't linger indefinitely.
+   CATBOX.MOE — free anonymous file host used as "blind" storage.
    ----------------------------------------------------------------------
    We NEVER upload a real photo/video/voice note in the clear. The file
    is AES-GCM-encrypted on-device first (see encryptBytes above), and
-   only that unreadable ciphertext blob is sent out. The host just sees
-   random bytes and hands back a direct URL to them — it has no way to
-   know it's hosting a photo, a video, or anything else. The URL itself
-   is then also encrypted before it's written to Firestore, so the
-   database never reveals which links belong to a room.
+   only that unreadable ciphertext blob is sent to Catbox. Catbox just
+   sees random bytes and hands back a direct URL to them — it has no
+   way to know it's hosting a photo, a video, or anything else. The
+   URL itself is then also encrypted before it's written to Firestore,
+   so the database never reveals which Catbox links belong to a room.
    ====================================================================== */
-// Litterbox's API sends no Access-Control-Allow-Origin header, so a direct
-// fetch() from a browser page hosted elsewhere is blocked by CORS before
-// the request even leaves the client (shows up as a generic "Failed to
-// fetch" TypeError). Fill in WORKER_PROXY_URL with your deployed
-// Cloudflare Worker (see worker.js) — it forwards the upload to Litterbox
-// server-side with the right CORS headers AND forces 72h expiry, so a
-// tampered client can't sneak a longer/shorter retention window through.
-// If left empty, the code below falls back to a direct request (works
-// from file:// or permissive setups) and then a couple of free public
-// CORS proxies as a last resort — both less reliable than the worker.
-const WORKER_PROXY_URL = ''; // e.g. 'https://litterbox-proxy.yourname.workers.dev'
-const LITTERBOX_ENDPOINT = 'https://litterbox.catbox.moe/resources/internals/api.php';
-const LITTERBOX_EXPIRY = '72h'; // only used on the direct/fallback paths — the worker forces this itself
-const LITTERBOX_CORS_FALLBACKS = [
-  url => 'https://corsproxy.io/?url=' + encodeURIComponent(url),
-  url => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
+// Catbox's API endpoint sends no Access-Control-Allow-Origin header, so a
+// direct fetch() from a browser page hosted elsewhere is blocked by CORS
+// before the request even leaves the client (shows up as a generic
+// "Failed to fetch" TypeError). Try the direct request first (works when
+// the page is opened from file:// or in setups where the browser allows
+// it), then fall back through a couple of free CORS proxies so the
+// upload actually reaches Catbox from a normal browser tab.
+const CATBOX_ENDPOINT = 'https://catbox.moe/user/api.php';
+
+// Your own Cloudflare Worker acting as a CORS-safe reverse proxy in front of
+// Catbox. This is the reliable path — public proxies below are flaky (rate
+// limits, 403s, broken POST handling) and only kept as a last-resort chain.
+// 1) Deploy worker.js (see accompanying file) to Cloudflare Workers (free).
+// 2) Paste the resulting *.workers.dev URL below.
+// 3) Leave it as '' to skip straight to the direct request / public proxies.
+const CATBOX_WORKER_PROXY = 'https://twilight-lab-2a73.zenakozub-ua.workers.dev';
+
+const CATBOX_CORS_FALLBACKS = [
   url => 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url),
   url => 'https://thingproxy.freeboard.io/fetch/' + url,
+  url => 'https://corsproxy.io/?url=' + encodeURIComponent(url),
+  url => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
 ];
 
 async function uploadEncryptedBlobToCatbox(blob) {
   const attempts = [
-    ...(WORKER_PROXY_URL ? [WORKER_PROXY_URL] : []),
-    LITTERBOX_ENDPOINT,
-    ...LITTERBOX_CORS_FALLBACKS.map(f => f(LITTERBOX_ENDPOINT)),
+    ...(CATBOX_WORKER_PROXY ? [CATBOX_WORKER_PROXY] : []),
+    CATBOX_ENDPOINT,
+    ...CATBOX_CORS_FALLBACKS.map(f => f(CATBOX_ENDPOINT)),
   ];
   let lastErr = null;
 
@@ -768,10 +902,9 @@ async function uploadEncryptedBlobToCatbox(blob) {
     try {
       const formData = new FormData();
       formData.append('reqtype', 'fileupload');
-      formData.append('time', LITTERBOX_EXPIRY); // ignored by the worker (it forces its own), used on direct/proxy paths
       // Generic extension — the real mime type is stored separately (see
       // message doc's `mime` field) and used to rebuild the file after
-      // decryption; the host itself never needs to know what it is.
+      // decryption; Catbox itself never needs to know what it is.
       formData.append('fileToUpload', blob, 'blob.enc');
       const resp = await fetch(endpoint, { method: 'POST', body: formData });
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
@@ -779,11 +912,11 @@ async function uploadEncryptedBlobToCatbox(blob) {
       if (!url.startsWith('http')) throw new Error('unexpected response: ' + url.slice(0, 200));
       return url;
     } catch (e) {
-      console.warn('Litterbox upload attempt failed via', endpoint, '→', e.message || e);
+      console.warn('Catbox upload attempt failed via', endpoint, '→', e.message || e);
       lastErr = e;
     }
   }
-  throw new Error('Litterbox upload failed (all routes exhausted): ' + (lastErr?.message || lastErr));
+  throw new Error('Catbox upload failed (all routes exhausted): ' + (lastErr?.message || lastErr));
 }
 
 // Downscales/recompresses an image client-side via <canvas> before it's
@@ -856,7 +989,7 @@ async function connectToRoom(roomId, passphrase) {
       const out = raw.sender === DEVICE_ID;
       const time = formatTime(raw.createdAt ? raw.createdAt.toDate() : new Date());
 
-      if (raw.kind === 'image' || raw.kind === 'video' || raw.kind === 'voice' || raw.kind === 'audio') {
+      if (raw.kind === 'image' || raw.kind === 'video' || raw.kind === 'voice') {
         const url = await decryptMessage(currentKey, raw.linkIv, raw.linkData);
         return {
           id: d.id, out, time, kind: raw.kind,
@@ -881,7 +1014,6 @@ async function connectToRoom(roomId, passphrase) {
       liveChat.preview = last.kind === 'text' ? last.text
         : last.kind === 'image' ? '📷 Фото'
         : last.kind === 'video' ? '🎥 Видео'
-        : last.kind === 'audio' ? '🎵 Аудио'
         : '🎤 Голосовое сообщение';
       renderChatList();
     }
@@ -1026,7 +1158,7 @@ function renderMessages(chat) {
     const bubble = document.createElement('div');
     bubble.className = 'bubble';
 
-    if (m.kind === 'image' || m.kind === 'video' || m.kind === 'voice' || m.kind === 'audio') {
+    if (m.kind === 'image' || m.kind === 'video' || m.kind === 'voice') {
       bubble.classList.add('media-bubble');
       if (m.broken || !m.url) {
         bubble.innerHTML = `<span class="bubble-text">🔒 Не удалось расшифровать (неверный ключ?)</span>`;
@@ -1088,24 +1220,15 @@ function renderMediaElement(msg, holderEl, objectUrl) {
     vid.controls = true;
     vid.className = 'media-content';
     holderEl.appendChild(vid);
-  } else if (msg.kind === 'voice' || msg.kind === 'audio') {
-    holderEl.appendChild(buildVoicePlayer(objectUrl, msg.duration, msg.kind === 'audio'));
+  } else if (msg.kind === 'voice') {
+    holderEl.appendChild(buildVoicePlayer(objectUrl, msg.duration));
   }
 }
 
 // Small custom play/pause + progress-bar UI backed by a hidden <audio>.
-// Reused for both recorded voice notes and uploaded audio files (mp3 etc);
-// isSong just swaps the icon so the two are visually distinguishable.
-function buildVoicePlayer(objectUrl, duration, isSong = false) {
+function buildVoicePlayer(objectUrl, duration) {
   const wrap = document.createElement('div');
   wrap.className = 'voice-player';
-
-  if (isSong) {
-    const noteIcon = document.createElement('span');
-    noteIcon.className = 'voice-note-icon';
-    noteIcon.textContent = '🎵';
-    wrap.appendChild(noteIcon);
-  }
 
   const playBtn = document.createElement('button');
   playBtn.className = 'voice-play-btn';
@@ -1263,23 +1386,11 @@ fileInput.addEventListener('change', async () => {
 
   const roomId = document.getElementById('room-input').value.trim() || 'demo-room';
   const isVideo = file.type.startsWith('video/');
-  const isAudio = !isVideo && file.type.startsWith('audio/');
-  const kind = isVideo ? 'video' : isAudio ? 'audio' : 'image';
+  const kind = isVideo ? 'video' : 'image';
 
   let blobToSend = file;
-  let mime = file.type || (isVideo ? 'video/mp4' : isAudio ? 'audio/mpeg' : 'image/jpeg');
-  let duration = 0;
-
-  if (isAudio) {
-    // Read the track length client-side before it's encrypted+uploaded,
-    // purely so the player can show a duration/progress bar — the file
-    // itself is sent as-is (no re-encoding, so quality is untouched).
-    try {
-      duration = await readMediaDuration(file);
-    } catch (e) {
-      console.warn('Could not read audio duration:', e);
-    }
-  } else if (!isVideo) {
+  let mime = file.type || (isVideo ? 'video/mp4' : 'image/jpeg');
+  if (!isVideo) {
     try {
       blobToSend = await compressImage(file);
       mime = 'image/jpeg';
@@ -1288,27 +1399,8 @@ fileInput.addEventListener('change', async () => {
     }
   }
 
-  sendMediaToFirebase(roomId, kind, blobToSend, mime, duration);
+  sendMediaToFirebase(roomId, kind, blobToSend, mime);
 });
-
-// Loads a local audio/video File just far enough to read its duration,
-// without uploading or playing anything.
-function readMediaDuration(file) {
-  return new Promise((resolve, reject) => {
-    const el = document.createElement('audio');
-    const objectUrl = URL.createObjectURL(file);
-    el.preload = 'metadata';
-    el.addEventListener('loadedmetadata', () => {
-      URL.revokeObjectURL(objectUrl);
-      resolve(el.duration || 0);
-    });
-    el.addEventListener('error', () => {
-      URL.revokeObjectURL(objectUrl);
-      reject(new Error('failed to read duration'));
-    });
-    el.src = objectUrl;
-  });
-}
 
 /* ======================================================================
    VOICE MESSAGES — record via MediaRecorder, send via Catbox (encrypted)
@@ -1388,6 +1480,326 @@ document.getElementById('room-join-btn').addEventListener('click', () => {
 });
 
 /* ======================================================================
+   ACCOUNT SYSTEM — @handle registration/login on top of the existing
+   passphrase-derived encryption engine.
+   ----------------------------------------------------------------------
+   - Each account's personal room is roomId = 'user:' + handle, and the
+     account PASSWORD doubles as that room's E2E passphrase (reusing
+     deriveRoomKey/connectToRoom as-is — no separate secret to manage).
+   - Login is verified against a "verifier" stored in Firestore: a fixed
+     known plaintext encrypted with the key derived from the password.
+     If decrypting it with the freshly-typed password succeeds and
+     matches, the password is correct. The real password is NEVER sent
+     anywhere or stored anywhere, only used locally to derive keys.
+   - SESSION PERSISTENCE uses an opaque random session token (like a
+     login cookie a normal server would issue), not the password/key
+     itself. The cookie only proves "this browser is @handle" and lets
+     the UI skip the login screen — it does NOT grant access to any
+     encrypted content. To actually decrypt/open a room (yours or
+     someone else's) you still type the password once per fresh page
+     load, same as the manual Room/Ключ bar below. This is intentionally
+     weaker persistence than caching the derived key, but much safer if
+     the cookie/localStorage is ever read by something else.
+   ====================================================================== */
+const VERIFIER_PLAINTEXT = 'account-verifier-v1';
+const ROOM_VERIFIER_PLAINTEXT = 'chat-verifier-v1';
+const SESSION_COOKIE = 'tg_session';
+const SESSION_DAYS = 7;
+
+function setCookie(name, value, days) {
+  const expires = new Date(Date.now() + days * 86400000).toUTCString();
+  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax`;
+}
+function getCookie(name) {
+  const match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+function deleteCookie(name) {
+  document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
+}
+
+function randomToken() {
+  return bufToB64(crypto.getRandomValues(new Uint8Array(24)).buffer).replace(/[^a-zA-Z0-9]/g, '');
+}
+
+function normalizeHandle(raw) {
+  return raw.trim().toLowerCase().replace(/^@/, '');
+}
+function isValidHandle(handle) {
+  return /^[a-z0-9_]{3,20}$/.test(handle);
+}
+
+// Derives an account key from (password, handle). Namespaced separately
+// from room keys ('acct:' vs 'user:' prefix) so the login verifier and
+// the room-encryption key are cryptographically distinct, even though
+// both ultimately come from the same password.
+function deriveAccountKey(password, handle) {
+  return deriveRoomKey(password, 'acct:' + handle);
+}
+
+let currentAccount = null; // { handle, nickname } once logged in this tab
+
+async function createSession(handle) {
+  const token = randomToken();
+  await setDoc(doc(db, 'sessions', token), {
+    handle,
+    createdAt: serverTimestamp(),
+    expiresAt: Date.now() + SESSION_DAYS * 86400000,
+  });
+  setCookie(SESSION_COOKIE, token, SESSION_DAYS);
+}
+
+async function destroySession() {
+  const token = getCookie(SESSION_COOKIE);
+  deleteCookie(SESSION_COOKIE);
+  if (token && db) {
+    try { await deleteDoc(doc(db, 'sessions', token)); } catch (e) { /* ignore */ }
+  }
+}
+
+function setAccountUI(account) {
+  currentAccount = account;
+  const label = document.getElementById('account-label');
+  const logoutBtn = document.getElementById('logout-btn');
+  if (account) {
+    label.textContent = '@' + account.handle;
+    logoutBtn.style.display = 'flex';
+    document.getElementById('auth-overlay').classList.add('hidden');
+  } else {
+    label.textContent = '';
+    logoutBtn.style.display = 'none';
+    document.getElementById('auth-overlay').classList.remove('hidden');
+    document.getElementById('unlock-overlay').style.display = 'none';
+  }
+}
+
+function showUnlockOverlay(show, handle) {
+  if (show) document.getElementById('unlock-handle').textContent = '@' + handle;
+  document.getElementById('unlock-error').textContent = '';
+  document.getElementById('unlock-password').value = '';
+  document.getElementById('unlock-overlay').style.display = show ? 'flex' : 'none';
+}
+
+async function tryRestoreSession() {
+  if (!db) initFirebase();
+  const token = getCookie(SESSION_COOKIE);
+  if (!token) { setAccountUI(null); return; }
+  try {
+    const snap = await getDoc(doc(db, 'sessions', token));
+    if (!snap.exists() || snap.data().expiresAt < Date.now()) {
+      await destroySession();
+      setAccountUI(null);
+      return;
+    }
+    const handle = snap.data().handle;
+    const userSnap = await getDoc(doc(db, 'users', handle));
+    if (!userSnap.exists()) { await destroySession(); setAccountUI(null); return; }
+    setAccountUI({ handle, nickname: userSnap.data().nickname });
+    showUnlockOverlay(true, handle); // identity restored, but chat key requires the chat password
+  } catch (e) {
+    console.error('Session restore failed:', e);
+    setAccountUI(null);
+  }
+}
+
+async function registerAccount(handle, nickname, accountPassword, chatPassword) {
+  if (!db) initFirebase();
+  handle = normalizeHandle(handle);
+  if (!isValidHandle(handle)) throw new Error('Handle: 3–20 символов, только a-z, 0-9, _');
+  if (!nickname.trim()) throw new Error('Введите отображаемое имя');
+  if (accountPassword.length < 4) throw new Error('Пароль аккаунта слишком короткий (мин. 4 символа)');
+  if (chatPassword.length < 4) throw new Error('Пароль чата слишком короткий (мин. 4 символа)');
+  if (accountPassword === chatPassword) throw new Error('Пароль аккаунта и пароль чата должны отличаться');
+
+  const existing = await getDoc(doc(db, 'users', handle));
+  if (existing.exists()) throw new Error('Этот @handle уже занят');
+
+  // Account verifier — proves you know the LOGIN password. Namespaced 'acct:'.
+  const accountKey = await deriveAccountKey(accountPassword, handle);
+  const verifier = await encryptMessage(accountKey, VERIFIER_PLAINTEXT);
+
+  // Room verifier — proves you know the CHAT password, completely separate
+  // secret from the login password. This is the same key deriveRoomKey/
+  // connectToRoom will use ('user:' + handle namespace) to encrypt messages,
+  // so someone who only has the account password still can't decrypt chats.
+  const roomKey = await deriveRoomKey(chatPassword, 'user:' + handle);
+  const roomVerifier = await encryptMessage(roomKey, ROOM_VERIFIER_PLAINTEXT);
+
+  await setDoc(doc(db, 'users', handle), {
+    handle, nickname: nickname.trim(),
+    verifierIv: verifier.iv, verifierData: verifier.data,
+    roomVerifierIv: roomVerifier.iv, roomVerifierData: roomVerifier.data,
+    createdAt: serverTimestamp(),
+  });
+
+  await createSession(handle);
+  setAccountUI({ handle, nickname: nickname.trim() });
+  // We already have the chat password right here, so unlock immediately
+  // instead of making the user type it again on the next screen.
+  await connectToRoom('user:' + handle, chatPassword);
+  showUnlockOverlay(false);
+  openChat('live');
+}
+
+async function loginAccount(handle, accountPassword) {
+  if (!db) initFirebase();
+  handle = normalizeHandle(handle);
+  const userSnap = await getDoc(doc(db, 'users', handle));
+  if (!userSnap.exists()) throw new Error('Пользователь не найден');
+
+  const key = await deriveAccountKey(accountPassword, handle);
+  const data = userSnap.data();
+  const plaintext = await decryptMessage(key, data.verifierIv, data.verifierData);
+  if (plaintext !== VERIFIER_PLAINTEXT) throw new Error('Неверный пароль');
+
+  await createSession(handle);
+  setAccountUI({ handle, nickname: data.nickname });
+  // Login only proves identity — the chat password is separate and wasn't
+  // provided here, so the room stays locked until it's entered explicitly.
+  showUnlockOverlay(true, handle);
+}
+
+document.getElementById('auth-tab-login').addEventListener('click', () => {
+  document.getElementById('auth-tab-login').classList.add('active');
+  document.getElementById('auth-tab-register').classList.remove('active');
+  document.getElementById('login-form').style.display = 'flex';
+  document.getElementById('register-form').style.display = 'none';
+});
+document.getElementById('auth-tab-register').addEventListener('click', () => {
+  document.getElementById('auth-tab-register').classList.add('active');
+  document.getElementById('auth-tab-login').classList.remove('active');
+  document.getElementById('register-form').style.display = 'flex';
+  document.getElementById('login-form').style.display = 'none';
+});
+
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const errEl = document.getElementById('login-error');
+  errEl.textContent = '';
+  try {
+    await loginAccount(
+      document.getElementById('login-handle').value,
+      document.getElementById('login-password').value
+    );
+  } catch (err) {
+    errEl.textContent = err.message;
+  }
+});
+
+document.getElementById('register-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const errEl = document.getElementById('register-error');
+  errEl.textContent = '';
+  const pw = document.getElementById('register-password').value;
+  const pw2 = document.getElementById('register-password2').value;
+  const chatPw = document.getElementById('register-chatpassword').value;
+  const chatPw2 = document.getElementById('register-chatpassword2').value;
+  if (pw !== pw2) { errEl.textContent = 'Пароли аккаунта не совпадают'; return; }
+  if (chatPw !== chatPw2) { errEl.textContent = 'Пароли чата не совпадают'; return; }
+  try {
+    await registerAccount(
+      document.getElementById('register-handle').value,
+      document.getElementById('register-nickname').value,
+      pw,
+      chatPw
+    );
+  } catch (err) {
+    errEl.textContent = err.message;
+  }
+});
+
+document.getElementById('unlock-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const errEl = document.getElementById('unlock-error');
+  errEl.textContent = '';
+  const chatPassword = document.getElementById('unlock-password').value;
+  if (!currentAccount) return;
+  try {
+    const userSnap = await getDoc(doc(db, 'users', currentAccount.handle));
+    const data = userSnap.data();
+    const roomKey = await deriveRoomKey(chatPassword, 'user:' + currentAccount.handle);
+    const plaintext = await decryptMessage(roomKey, data.roomVerifierIv, data.roomVerifierData);
+    if (plaintext !== ROOM_VERIFIER_PLAINTEXT) { errEl.textContent = 'Неверный пароль чата'; return; }
+    await connectToRoom('user:' + currentAccount.handle, chatPassword);
+    showUnlockOverlay(false);
+    openChat('live');
+  } catch (err) {
+    errEl.textContent = 'Ошибка: ' + err.message;
+  }
+});
+
+document.getElementById('logout-btn').addEventListener('click', async () => {
+  await destroySession();
+  currentKey = null;
+  currentRoomId = null;
+  if (unsubscribe) unsubscribe();
+  setConnStatus(false, 'Вышли из аккаунта');
+  setAccountUI(null);
+});
+
+/* ---- Find user by @handle ---- */
+const finduserBtn = document.getElementById('finduser-btn');
+const finduserOverlay = document.getElementById('finduser-overlay');
+let foundHandle = null;
+
+finduserBtn.addEventListener('click', () => {
+  document.getElementById('finduser-error').textContent = '';
+  document.getElementById('finduser-profile').style.display = 'none';
+  document.getElementById('finduser-handle').value = '';
+  finduserOverlay.style.display = 'flex';
+});
+document.getElementById('finduser-close').addEventListener('click', () => {
+  finduserOverlay.style.display = 'none';
+});
+
+document.getElementById('finduser-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const errEl = document.getElementById('finduser-error');
+  errEl.textContent = '';
+  document.getElementById('finduser-profile').style.display = 'none';
+  const handle = normalizeHandle(document.getElementById('finduser-handle').value);
+  if (!db) initFirebase();
+  try {
+    const snap = await getDoc(doc(db, 'users', handle));
+    if (!snap.exists()) { errEl.textContent = 'Пользователь не найден'; return; }
+    foundHandle = handle;
+    const data = snap.data();
+    document.getElementById('finduser-nickname').textContent = data.nickname;
+    document.getElementById('finduser-handle-label').textContent = '@' + handle;
+    document.getElementById('finduser-avatar').textContent = (data.nickname[0] || '?').toUpperCase();
+    document.getElementById('finduser-password').value = '';
+    document.getElementById('finduser-enter-error').textContent = '';
+    document.getElementById('finduser-profile').style.display = 'flex';
+  } catch (err) {
+    errEl.textContent = 'Ошибка поиска: ' + err.message;
+  }
+});
+
+document.getElementById('finduser-enter-btn').addEventListener('click', async () => {
+  const errEl = document.getElementById('finduser-enter-error');
+  errEl.textContent = '';
+  const password = document.getElementById('finduser-password').value;
+  if (!foundHandle || !password) { errEl.textContent = 'Введите пароль'; return; }
+  try {
+    // Verify against that account's CHAT-password verifier (not their
+    // login/account verifier — the two are separate secrets), so a wrong
+    // password gives a clear error instead of silently landing in a room
+    // full of undecryptable messages.
+    const userSnap = await getDoc(doc(db, 'users', foundHandle));
+    const data = userSnap.data();
+    const key = await deriveRoomKey(password, 'user:' + foundHandle);
+    const plaintext = await decryptMessage(key, data.roomVerifierIv, data.roomVerifierData);
+    if (plaintext !== ROOM_VERIFIER_PLAINTEXT) { errEl.textContent = 'Неверный пароль чата'; return; }
+
+    await connectToRoom('user:' + foundHandle, password);
+    finduserOverlay.style.display = 'none';
+    openChat('live');
+  } catch (err) {
+    errEl.textContent = 'Ошибка: ' + err.message;
+  }
+});
+
+/* ======================================================================
    INIT
    ====================================================================== */
 renderChatList();
@@ -1395,6 +1807,7 @@ openChat('live');
 appEl.classList.remove('chat-open'); // stay on chat list first on mobile until user taps it
 // Try to init Firebase silently on load (won't connect until user hits "Connect")
 initFirebase();
+tryRestoreSession();
 </script>
 </body>
 </html>
