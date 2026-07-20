@@ -1,0 +1,1322 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Telegram Web Clone</title>
+<style>
+  :root{
+    --bg-sidebar: #17212b;
+    --bg-app: #0e1621;
+    --bg-chat-pattern: #0e1621;
+    --bg-header: #17212b;
+    --bg-hover: #1c2733;
+    --bg-active: #2b5278;
+    --bg-input-panel: #17212b;
+    --bubble-out: #2b5278;
+    --bubble-in: #182533;
+    --accent: #5288c1;
+    --accent-purple: #8e6cd6;
+    --text-primary: #ffffff;
+    --text-secondary: #6c7883;
+    --text-time: #7d8b99;
+    --border-color: #0f1621;
+    --badge-bg: #4d76a3;
+    --badge-muted: #3b4b5a;
+    --online-dot: #4dcb5a;
+    --scrollbar-thumb: #24333f;
+  }
+
+  *{ box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html,body{
+    margin:0; padding:0; height:100%;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg-app);
+    color: var(--text-primary);
+    overflow: hidden;
+  }
+
+  ::-webkit-scrollbar{ width:6px; }
+  ::-webkit-scrollbar-thumb{ background: var(--scrollbar-thumb); border-radius: 3px; }
+  ::-webkit-scrollbar-track{ background: transparent; }
+
+  #app{
+    display: flex;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  /* ============ SIDEBAR ============ */
+  #sidebar{
+    width: 400px;
+    min-width: 400px;
+    max-width: 400px;
+    background: var(--bg-sidebar);
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--border-color);
+    position: relative;
+    z-index: 5;
+  }
+
+  #sidebar-header{
+    display:flex;
+    align-items:center;
+    gap: 14px;
+    padding: 10px 12px;
+    height: 56px;
+    flex-shrink: 0;
+  }
+
+  .icon-btn{
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    display:flex; align-items:center; justify-content:center;
+    cursor: pointer;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+    border: none;
+    background: transparent;
+    transition: background .15s;
+  }
+  .icon-btn:hover{ background: rgba(255,255,255,0.06); }
+  .icon-btn svg{ width: 22px; height: 22px; fill: currentColor; }
+
+  #search-bar{
+    flex:1;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 18px;
+    padding: 0 14px;
+    height: 38px;
+  }
+  #search-bar svg{ width:18px; height:18px; fill: var(--text-secondary); flex-shrink:0; }
+  #search-bar input{
+    background: none; border: none; outline: none;
+    color: var(--text-primary);
+    font-size: 15px;
+    width: 100%;
+  }
+  #search-bar input::placeholder{ color: var(--text-secondary); }
+
+  #chat-list{
+    flex:1;
+    overflow-y: auto;
+    padding-bottom: 80px;
+  }
+
+  .chat-item{
+    display:flex;
+    align-items:center;
+    gap: 12px;
+    padding: 9px 12px;
+    cursor: pointer;
+    position: relative;
+    transition: background .12s;
+    border-bottom: 1px solid transparent;
+  }
+  .chat-item:hover{ background: var(--bg-hover); }
+  .chat-item.active{ background: var(--bg-active); }
+
+  .avatar{
+    width: 54px; height: 54px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display:flex; align-items:center; justify-content:center;
+    font-size: 20px;
+    font-weight: 600;
+    color: #fff;
+    background-size: cover;
+    background-position: center;
+    position: relative;
+  }
+
+  .chat-info{
+    flex:1;
+    min-width: 0;
+    display:flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .chat-row-top{
+    display:flex;
+    justify-content: space-between;
+    align-items:baseline;
+  }
+  .chat-name{
+    font-size: 15.5px;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow:hidden;
+    text-overflow: ellipsis;
+  }
+  .chat-time{
+    font-size: 12.5px;
+    color: var(--text-time);
+    flex-shrink: 0;
+    margin-left: 6px;
+  }
+  .chat-row-bottom{
+    display:flex;
+    justify-content: space-between;
+    align-items:center;
+    margin-top: 3px;
+  }
+  .chat-preview{
+    font-size: 14px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow:hidden;
+    text-overflow: ellipsis;
+  }
+  .unread-badge{
+    background: var(--accent-purple);
+    color: #fff;
+    font-size: 12.5px;
+    font-weight: 600;
+    min-width: 21px;
+    height: 21px;
+    border-radius: 11px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding: 0 6px;
+    flex-shrink: 0;
+    margin-left: 6px;
+  }
+  .unread-badge.muted{ background: var(--badge-muted); color: var(--text-secondary); }
+
+  #fab-new-chat{
+    position: absolute;
+    bottom: 22px;
+    right: 22px;
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    background: var(--accent-purple);
+    display:flex; align-items:center; justify-content:center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    cursor: pointer;
+    border:none;
+    z-index: 10;
+    transition: transform .15s;
+  }
+  #fab-new-chat:hover{ transform: scale(1.06); }
+  #fab-new-chat svg{ width: 24px; height:24px; fill:#fff; }
+
+  /* ============ CHAT AREA ============ */
+  #chat-area{
+    flex:1;
+    display:flex;
+    flex-direction: column;
+    position: relative;
+    background-color: var(--bg-chat-pattern);
+    background-image:
+      radial-gradient(circle at 5% 8%, rgba(255,255,255,0.025) 2px, transparent 2px),
+      radial-gradient(circle at 25% 22%, rgba(255,255,255,0.02) 3px, transparent 3px),
+      radial-gradient(circle at 60% 12%, rgba(255,255,255,0.025) 2px, transparent 2px),
+      radial-gradient(circle at 80% 35%, rgba(255,255,255,0.02) 2px, transparent 2px),
+      radial-gradient(circle at 40% 55%, rgba(255,255,255,0.02) 3px, transparent 3px),
+      radial-gradient(circle at 90% 70%, rgba(255,255,255,0.025) 2px, transparent 2px),
+      radial-gradient(circle at 15% 80%, rgba(255,255,255,0.02) 2px, transparent 2px),
+      radial-gradient(circle at 70% 90%, rgba(255,255,255,0.02) 3px, transparent 3px);
+    background-repeat: repeat;
+    background-size: 400px 400px;
+  }
+
+  #chat-area::before{
+    content:"";
+    position:absolute; inset:0;
+    background:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cg fill='none' stroke='%23ffffff' stroke-opacity='0.035' stroke-width='1.5'%3E%3Ccircle cx='40' cy='40' r='18'/%3E%3Cpath d='M100 30 L120 30 L120 55 Z'/%3E%3Crect x='180' y='20' width='30' height='30' rx='8'/%3E%3Cpath d='M40 150 q15 -20 30 0 t30 0'/%3E%3Ccircle cx='230' cy='120' r='12'/%3E%3Cpath d='M20 220 L45 220 L32 245 Z'/%3E%3Crect x='140' y='200' width='24' height='24' rx='12'/%3E%3Cpath d='M220 220 q10 -15 20 0'/%3E%3C/g%3E%3C/svg%3E");
+    background-repeat: repeat;
+    pointer-events: none;
+  }
+
+  #chat-header{
+    height: 56px;
+    flex-shrink:0;
+    background: var(--bg-header);
+    display:flex;
+    align-items:center;
+    gap: 12px;
+    padding: 0 14px;
+    z-index: 2;
+    border-bottom: 1px solid var(--border-color);
+  }
+  #back-btn{ display:none; }
+  #chat-header .avatar{ width: 40px; height:40px; font-size:15px; }
+  #chat-header-info{ display:flex; flex-direction:column; justify-content:center; min-width:0; }
+  #chat-header-name{ font-size:15.5px; font-weight:500; }
+  #chat-header-status{ font-size: 13px; color: var(--text-secondary); }
+  #chat-header-status.online{ color: var(--accent); }
+  #chat-header-actions{ margin-left:auto; display:flex; gap:4px; }
+
+  #messages{
+    flex:1;
+    overflow-y: auto;
+    padding: 16px 8%;
+    display:flex;
+    flex-direction: column;
+    gap: 3px;
+    z-index: 1;
+    position: relative;
+  }
+
+  .msg-row{
+    display:flex;
+    max-width: 100%;
+  }
+  .msg-row.out{ justify-content: flex-end; }
+  .msg-row.in{ justify-content: flex-start; }
+
+  .bubble{
+    max-width: 55%;
+    padding: 7px 10px 8px 12px;
+    border-radius: 12px;
+    position: relative;
+    font-size: 15px;
+    line-height: 1.35;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+    box-shadow: 0 1px 1px rgba(0,0,0,0.15);
+  }
+  .msg-row.out .bubble{
+    background: var(--bubble-out);
+    border-bottom-right-radius: 3px;
+    color: #fff;
+  }
+  .msg-row.in .bubble{
+    background: var(--bubble-in);
+    border-bottom-left-radius: 3px;
+    color: #fff;
+  }
+  .bubble-meta{
+    display:inline-flex;
+    align-items:center;
+    gap: 3px;
+    float: right;
+    margin-left: 8px;
+    margin-top: 4px;
+    font-size: 11.5px;
+    color: rgba(255,255,255,0.6);
+    position: relative;
+    top: 4px;
+  }
+  .bubble-meta svg{ width:15px; height:15px; }
+  .bubble-text{ display:inline; }
+
+  @media (min-width: 769px){
+    .bubble{ max-width: 45%; }
+  }
+
+  /* ============ INPUT PANEL ============ */
+  #input-panel{
+    flex-shrink:0;
+    background: var(--bg-input-panel);
+    display:flex;
+    align-items:flex-end;
+    gap: 8px;
+    padding: 8px 12px;
+    z-index: 2;
+    border-top: 1px solid var(--border-color);
+  }
+  #message-input{
+    flex:1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text-primary);
+    font-size: 15.5px;
+    resize: none;
+    max-height: 120px;
+    padding: 9px 4px;
+    line-height: 1.3;
+    font-family: inherit;
+  }
+  #message-input::placeholder{ color: var(--text-secondary); }
+  #send-btn{
+    background: var(--accent);
+    border-radius: 50%;
+  }
+  #send-btn svg{ fill: #fff; }
+
+  #room-bar{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding: 6px 12px;
+    background: rgba(0,0,0,0.25);
+    font-size: 12.5px;
+    color: var(--text-secondary);
+    flex-shrink:0;
+    z-index:2;
+    flex-wrap: wrap;
+  }
+  #room-bar input{
+    background: rgba(255,255,255,0.06);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-primary);
+    padding: 4px 8px;
+    font-size: 12.5px;
+    width: 110px;
+    outline:none;
+  }
+  #room-bar button{
+    background: var(--accent);
+    border:none;
+    color:#fff;
+    border-radius:6px;
+    padding: 4px 10px;
+    font-size: 12.5px;
+    cursor:pointer;
+  }
+  #conn-status{ margin-left:auto; }
+  #conn-status.ok{ color: var(--online-dot); }
+  #conn-status.bad{ color: #e05c5c; }
+
+  /* ============ MEDIA BUBBLES ============ */
+  .media-bubble{ padding: 4px; max-width: 320px !important; }
+  .media-holder{
+    display:flex; align-items:center; justify-content:center;
+    min-height: 60px;
+    color: rgba(255,255,255,0.75);
+    font-size: 13.5px;
+  }
+  .media-content{
+    display:block;
+    max-width: 100%;
+    max-height: 320px;
+    border-radius: 9px;
+    cursor: pointer;
+  }
+  video.media-content{ cursor: default; }
+  .media-bubble .bubble-meta{
+    float:none;
+    display:flex;
+    justify-content:flex-end;
+    margin: 4px 6px 2px 0;
+  }
+
+  .voice-player{
+    display:flex;
+    align-items:center;
+    gap: 10px;
+    padding: 6px 10px;
+    min-width: 220px;
+  }
+  .voice-play-btn{
+    width: 36px; height:36px;
+    border-radius:50%;
+    border:none;
+    background: rgba(255,255,255,0.15);
+    color:#fff;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+    flex-shrink:0;
+  }
+  .voice-play-btn svg{ width:18px; height:18px; fill:#fff; }
+  .voice-track{
+    flex:1;
+    height: 4px;
+    background: rgba(255,255,255,0.25);
+    border-radius: 2px;
+    position: relative;
+    cursor: pointer;
+  }
+  .voice-progress{
+    position:absolute; left:0; top:0; bottom:0;
+    width:0%;
+    background:#fff;
+    border-radius:2px;
+  }
+  .voice-time{
+    font-size: 12px;
+    color: rgba(255,255,255,0.75);
+    min-width: 32px;
+    text-align:right;
+  }
+
+  /* ============ RECORDING BAR ============ */
+  #recording-bar{
+    flex-shrink:0;
+    background: var(--bg-input-panel);
+    display:flex;
+    align-items:center;
+    gap: 10px;
+    padding: 10px 16px;
+    border-top: 1px solid var(--border-color);
+    z-index: 2;
+  }
+  .rec-dot{
+    width:10px; height:10px;
+    border-radius:50%;
+    background:#eb5757;
+    animation: rec-pulse 1s infinite ease-in-out;
+    flex-shrink:0;
+  }
+  @keyframes rec-pulse{ 0%,100%{opacity:1;} 50%{opacity:.35;} }
+  #recording-time{ font-variant-numeric: tabular-nums; color:var(--text-primary); }
+  .rec-hint{ color: var(--text-secondary); font-size: 13.5px; }
+  #rec-cancel-btn, #rec-stop-btn{
+    margin-left: auto;
+    width: 34px; height:34px;
+    border-radius:50%;
+    border:none;
+    cursor:pointer;
+    font-size: 15px;
+  }
+  #rec-cancel-btn{ background: rgba(255,255,255,0.08); color: var(--text-secondary); margin-left:auto; }
+  #rec-stop-btn{ background: var(--accent); color:#fff; margin-left:8px; }
+
+  .empty-state{
+    flex:1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color: var(--text-secondary);
+    font-size: 15px;
+    text-align:center;
+    z-index:1;
+    position:relative;
+  }
+
+  /* ============ RESPONSIVE / MOBILE ============ */
+  @media (max-width: 768px){
+    #sidebar{
+      width: 100%;
+      min-width: 100%;
+      max-width: 100%;
+      position: absolute;
+      inset: 0;
+      z-index: 6;
+      transition: transform .28s ease;
+    }
+    #chat-area{
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      transform: translateX(100%);
+      transition: transform .28s ease;
+      z-index: 7;
+    }
+    #app.chat-open #sidebar{ transform: translateX(-100%); }
+    #app.chat-open #chat-area{ transform: translateX(0); }
+    #back-btn{ display:flex; }
+    #menu-btn{ display:flex; }
+    .bubble{ max-width: 78%; }
+    #messages{ padding: 12px 4%; }
+  }
+
+  @media (min-width: 769px){
+    #back-btn{ display:none; }
+  }
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ================= SIDEBAR ================= -->
+  <div id="sidebar">
+    <div id="sidebar-header">
+      <button class="icon-btn" id="menu-btn" title="Menu">
+        <svg viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+      </button>
+      <div id="search-bar">
+        <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.7.7l.27.28v.79l5 5L20.49 19l-5-5zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14z"/></svg>
+        <input type="text" id="search-input" placeholder="Search">
+      </div>
+    </div>
+    <div id="chat-list"></div>
+    <button id="fab-new-chat" title="New chat">
+      <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75zm17.71-10.04a1 1 0 0 0 0-1.41l-2.51-2.51a1 1 0 0 0-1.41 0l-1.96 1.96 3.75 3.75z"/></svg>
+    </button>
+  </div>
+
+  <!-- ================= CHAT AREA ================= -->
+  <div id="chat-area">
+    <div id="chat-header">
+      <button class="icon-btn" id="back-btn" title="Back">
+        <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z"/></svg>
+      </button>
+      <div class="avatar" id="chat-header-avatar" style="background:linear-gradient(135deg,#7c6ce0,#4d76a3)">?</div>
+      <div id="chat-header-info">
+        <div id="chat-header-name">Select a chat</div>
+        <div id="chat-header-status"></div>
+      </div>
+      <div id="chat-header-actions">
+        <button class="icon-btn"><svg viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3zm5.3 8a1 1 0 0 0-1 1 4.3 4.3 0 0 1-8.6 0 1 1 0 1 0-2 0 6.3 6.3 0 0 0 5.3 6.22V19H9a1 1 0 1 0 0 2h6a1 1 0 1 0 0-2h-2v-1.78A6.3 6.3 0 0 0 18.3 11a1 1 0 0 0-1-1z"/></svg></button>
+        <button class="icon-btn"><svg viewBox="0 0 24 24"><path d="M12 8a2 2 0 1 0-2-2 2 2 0 0 0 2 2zm0 2a2 2 0 1 0 2 2 2 2 0 0 0-2-2zm0 6a2 2 0 1 0 2 2 2 2 0 0 0-2-2z"/></svg></button>
+      </div>
+    </div>
+
+    <div id="messages"></div>
+
+    <div class="empty-state" id="empty-state">Select a chat to start messaging</div>
+
+    <div id="input-panel" style="display:none;">
+      <button class="icon-btn" id="attach-btn" title="Прикрепить фото/видео">
+        <svg viewBox="0 0 24 24"><path d="M16.5 6v11.5a4 4 0 0 1-8 0V5a2.5 2.5 0 0 1 5 0v10.5a1 1 0 0 1-2 0V6H10v9.5a2.5 2.5 0 0 0 5 0V5a4 4 0 0 0-8 0v12.5a5.5 5.5 0 0 0 11 0V6z"/></svg>
+      </button>
+      <input type="file" id="file-input" accept="image/*,video/*" style="display:none">
+      <textarea id="message-input" placeholder="Write a message..." rows="1"></textarea>
+      <button class="icon-btn" id="mic-btn" title="Голосовое сообщение">
+        <svg viewBox="0 0 24 24"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11z"/></svg>
+      </button>
+      <button class="icon-btn" id="send-btn">
+        <svg viewBox="0 0 24 24"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg>
+      </button>
+    </div>
+    <div id="recording-bar" style="display:none;">
+      <span class="rec-dot"></span>
+      <span id="recording-time">0:00</span>
+      <span class="rec-hint">Запись голосового…</span>
+      <button id="rec-cancel-btn" title="Отменить">✕</button>
+      <button id="rec-stop-btn" title="Отправить">✓</button>
+    </div>
+
+    <div id="room-bar">
+      <span>Room:</span>
+      <input type="text" id="room-input" placeholder="room id" value="demo-room">
+      <span>Ключ:</span>
+      <input type="password" id="passphrase-input" placeholder="секретная фраза">
+      <button id="room-join-btn">Connect</button>
+      <span id="conn-status" class="bad">Firebase not configured</span>
+    </div>
+  </div>
+
+</div>
+
+<script type="module">
+/* ======================================================================
+   FIREBASE SETUP
+   ----------------------------------------------------------------------
+   1. Create a free project at https://console.firebase.google.com
+   2. Enable "Firestore Database" (start in test mode for a quick demo).
+   3. Copy your web app config into firebaseConfig below.
+   4. Both devices must open this file and enter the SAME "Room ID" AND
+      the SAME "Ключ" (passphrase) in the bottom bar — the room id links
+      the two devices to the same Firestore path, and the passphrase is
+      what lets them derive the same AES-GCM key to read each other's
+      messages. The passphrase itself is never sent anywhere; only
+      ciphertext ends up in Firestore (see the E2E ENCRYPTION block
+      below for details).
+   ====================================================================== */
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getFirestore, collection, addDoc, query, orderBy,
+  onSnapshot, serverTimestamp, limit
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+// PASTE YOUR OWN CONFIG HERE ⬇⬇⬇
+const firebaseConfig = {
+  apiKey: "AIzaSyABT8PW_jJgKbNwYN2YEU-5Prh6E47ZhmM",
+  authDomain: "mychat-9eed0.firebaseapp.com",
+  projectId: "mychat-9eed0",
+  storageBucket: "mychat-9eed0.firebasestorage.app",
+  messagingSenderId: "922527683519",
+  appId: "1:922527683519:web:2e66f26327a9396da6c70a",
+  measurementId: "G-9SPK3ZNLML"
+};
+
+let db = null;
+let unsubscribe = null;
+// A unique id for THIS browser tab/device, so we know which bubbles are "outgoing"
+const DEVICE_ID = localStorage.getItem('tg_device_id') ||
+  (() => { const id = 'dev_' + Math.random().toString(36).slice(2, 10); localStorage.setItem('tg_device_id', id); return id; })();
+
+/* ======================================================================
+   END-TO-END ENCRYPTION (AES-GCM 256, key derived via PBKDF2)
+   ----------------------------------------------------------------------
+   - The room passphrase NEVER leaves the browser and is NEVER sent to
+     Firebase — only the two (or more) devices that type the same
+     passphrase for the same room can derive the same AES key and read
+     the messages.
+   - Every message gets its own random 12-byte IV. Only { iv, data }
+     (both base64, unreadable ciphertext) is written to Firestore —
+     the plaintext field is never stored, so a database leak reveals
+     nothing.
+   - Encryption happens in sendToFirebase() right before addDoc();
+     decryption happens inside the onSnapshot() callback right after
+     the ciphertext is read back — the rest of the UI only ever
+     touches plaintext, so no other code had to change.
+   ====================================================================== */
+const ENC = new TextEncoder();
+const DEC = new TextDecoder();
+
+function bufToB64(buf) {
+  return btoa(String.fromCharCode(...new Uint8Array(buf)));
+}
+function b64ToBuf(b64) {
+  return Uint8Array.from(atob(b64), c => c.charCodeAt(0)).buffer;
+}
+
+// Derive a 256-bit AES-GCM key from the room passphrase. The room id is
+// mixed in as the PBKDF2 salt so the same passphrase produces a different
+// key per room, and both devices only need to agree on room id + passphrase.
+async function deriveRoomKey(passphrase, roomId) {
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw', ENC.encode(passphrase), { name: 'PBKDF2' }, false, ['deriveKey']
+  );
+  return crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt: ENC.encode('tg-clone-salt::' + roomId),
+      iterations: 150000,
+      hash: 'SHA-256'
+    },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    false, // not extractable — key material never leaves the CryptoKey object
+    ['encrypt', 'decrypt']
+  );
+}
+
+// Encrypt plaintext -> { iv, data } (both base64) ready to store in Firestore.
+async function encryptMessage(key, plaintext) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const cipherBuf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, ENC.encode(plaintext));
+  return { iv: bufToB64(iv), data: bufToB64(cipherBuf) };
+}
+
+// Decrypt { iv, data } back to plaintext. Returns null if the passphrase
+// is wrong or the data is corrupted/tampered (AES-GCM auth tag fails).
+async function decryptMessage(key, ivB64, dataB64) {
+  try {
+    const plainBuf = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: new Uint8Array(b64ToBuf(ivB64)) },
+      key,
+      b64ToBuf(dataB64)
+    );
+    return DEC.decode(plainBuf);
+  } catch (e) {
+    return null;
+  }
+}
+
+// Same idea as encryptMessage/decryptMessage but for raw binary data
+// (images/video/voice notes) instead of text — used before uploading a
+// file to Catbox and after downloading it back.
+async function encryptBytes(key, arrayBuffer) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const cipherBuf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, arrayBuffer);
+  return { iv: bufToB64(iv), cipherBuf };
+}
+async function decryptBytes(key, ivB64, cipherBuf) {
+  try {
+    return await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: new Uint8Array(b64ToBuf(ivB64)) },
+      key,
+      cipherBuf
+    );
+  } catch (e) {
+    return null;
+  }
+}
+
+/* ======================================================================
+   CATBOX.MOE — free anonymous file host used as "blind" storage.
+   ----------------------------------------------------------------------
+   We NEVER upload a real photo/video/voice note in the clear. The file
+   is AES-GCM-encrypted on-device first (see encryptBytes above), and
+   only that unreadable ciphertext blob is sent to Catbox. Catbox just
+   sees random bytes and hands back a direct URL to them — it has no
+   way to know it's hosting a photo, a video, or anything else. The
+   URL itself is then also encrypted before it's written to Firestore,
+   so the database never reveals which Catbox links belong to a room.
+   ====================================================================== */
+async function uploadEncryptedBlobToCatbox(blob) {
+  const formData = new FormData();
+  formData.append('reqtype', 'fileupload');
+  // Generic extension — the real mime type is stored separately (see
+  // message doc's `mime` field) and used to rebuild the file after
+  // decryption; Catbox itself never needs to know what it is.
+  formData.append('fileToUpload', blob, 'blob.enc');
+  const resp = await fetch('https://catbox.moe/user/api.php', {
+    method: 'POST',
+    body: formData
+  });
+  if (!resp.ok) throw new Error('Catbox upload failed: ' + resp.status);
+  const url = (await resp.text()).trim();
+  if (!url.startsWith('http')) throw new Error('Catbox returned unexpected response: ' + url);
+  return url;
+}
+
+// Downscales/recompresses an image client-side via <canvas> before it's
+// encrypted+uploaded, so photos don't balloon the upload/download size.
+async function compressImage(file, maxDim = 1600, quality = 0.82) {
+  const bitmap = await createImageBitmap(file);
+  let { width, height } = bitmap;
+  if (width > maxDim || height > maxDim) {
+    const scale = maxDim / Math.max(width, height);
+    width = Math.round(width * scale);
+    height = Math.round(height * scale);
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = width; canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(bitmap, 0, 0, width, height);
+  return await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', quality));
+}
+
+// Current room's derived key + the passphrase/room it was derived for.
+let currentKey = null;
+let currentRoomId = null;
+
+function initFirebase() {
+  try {
+    const app = initializeApp(firebaseConfig);
+    db = getFirestore(app);
+    return true;
+  } catch (e) {
+    console.error("Firebase init failed:", e);
+    return false;
+  }
+}
+
+function setConnStatus(ok, text) {
+  const el = document.getElementById('conn-status');
+  el.textContent = text;
+  el.className = ok ? 'ok' : 'bad';
+}
+
+async function connectToRoom(roomId, passphrase) {
+  if (!db) {
+    const ok = initFirebase();
+    if (!ok) { setConnStatus(false, 'Firebase config missing/invalid'); return; }
+  }
+  if (!passphrase) {
+    setConnStatus(false, 'Введите секретную фразу для шифрования');
+    return;
+  }
+  if (unsubscribe) unsubscribe();
+
+  setConnStatus(true, 'Deriving key…');
+  currentKey = await deriveRoomKey(passphrase, roomId);
+  currentRoomId = roomId;
+
+  const msgsRef = collection(db, 'rooms', roomId, 'messages');
+  const q = query(msgsRef, orderBy('createdAt', 'asc'), limit(500));
+
+  setConnStatus(true, 'Connecting…');
+  unsubscribe = onSnapshot(q, async (snap) => {
+    const liveChat = chats.find(c => c.id === 'live');
+
+    // Ciphertext comes back from Firestore — decrypt every message locally
+    // with the key derived from the passphrase. For text messages we
+    // decrypt the text itself; for media messages we only decrypt the
+    // Catbox link here (cheap) — the actual file bytes are fetched +
+    // decrypted lazily when the bubble is rendered (see loadMediaInto).
+    const decoded = await Promise.all(snap.docs.map(async (d) => {
+      const raw = d.data();
+      const out = raw.sender === DEVICE_ID;
+      const time = formatTime(raw.createdAt ? raw.createdAt.toDate() : new Date());
+
+      if (raw.kind === 'image' || raw.kind === 'video' || raw.kind === 'voice') {
+        const url = await decryptMessage(currentKey, raw.linkIv, raw.linkData);
+        return {
+          id: d.id, out, time, kind: raw.kind,
+          url, fileIv: raw.fileIv, mime: raw.mime, duration: raw.duration || 0,
+          broken: url === null
+        };
+      }
+
+      const plaintext = await decryptMessage(currentKey, raw.iv, raw.data);
+      return {
+        id: d.id, out, time, kind: 'text',
+        text: plaintext !== null ? plaintext : '🔒 Не удалось расшифровать (неверный ключ?)'
+      };
+    }));
+
+    liveChat.messages = decoded;
+    setConnStatus(true, '🔒 Encrypted · room: ' + roomId);
+
+    if (activeChatId === 'live') renderMessages(liveChat);
+    if (liveChat.messages.length) {
+      const last = liveChat.messages[liveChat.messages.length - 1];
+      liveChat.preview = last.kind === 'text' ? last.text
+        : last.kind === 'image' ? '📷 Фото'
+        : last.kind === 'video' ? '🎥 Видео'
+        : '🎤 Голосовое сообщение';
+      renderChatList();
+    }
+  }, (err) => {
+    console.error(err);
+    setConnStatus(false, 'Connection error — check config/rules');
+  });
+}
+
+async function sendToFirebase(roomId, text) {
+  if (!db || !currentKey || currentRoomId !== roomId) {
+    setConnStatus(false, 'Сначала подключитесь к комнате (Room ID + фраза)');
+    return;
+  }
+  try {
+    // Encrypt on-device BEFORE it ever touches the network/Firestore.
+    // Only unreadable { iv, data } ciphertext is written — the plaintext
+    // field does not exist in the database at all.
+    const { iv, data } = await encryptMessage(currentKey, text);
+    await addDoc(collection(db, 'rooms', roomId, 'messages'), {
+      kind: 'text',
+      iv,
+      data,
+      sender: DEVICE_ID,
+      createdAt: serverTimestamp()
+    });
+  } catch (e) {
+    console.error("Send failed:", e);
+    setConnStatus(false, 'Send failed — check config/rules');
+  }
+}
+
+// Shared path for photo / video / voice-note sending: encrypt the raw
+// bytes, upload the ciphertext blob to Catbox (blind storage — Catbox
+// never sees the real content), then encrypt the returned link and
+// write a message doc pointing at it.
+async function sendMediaToFirebase(roomId, kind, fileBlob, mime, duration = 0) {
+  if (!db || !currentKey || currentRoomId !== roomId) {
+    setConnStatus(false, 'Сначала подключитесь к комнате (Room ID + фраза)');
+    return;
+  }
+  try {
+    setConnStatus(true, kind === 'voice' ? 'Отправка голосового…' : 'Загрузка файла…');
+    const buffer = await fileBlob.arrayBuffer();
+    const { iv: fileIv, cipherBuf } = await encryptBytes(currentKey, buffer);
+    const url = await uploadEncryptedBlobToCatbox(new Blob([cipherBuf]));
+    const { iv: linkIv, data: linkData } = await encryptMessage(currentKey, url);
+
+    await addDoc(collection(db, 'rooms', roomId, 'messages'), {
+      kind, linkIv, linkData, fileIv, mime, duration,
+      sender: DEVICE_ID,
+      createdAt: serverTimestamp()
+    });
+    setConnStatus(true, '🔒 Encrypted · room: ' + roomId);
+  } catch (e) {
+    console.error("Media send failed:", e);
+    setConnStatus(false, 'Не удалось отправить файл (проверь интернет/Catbox)');
+  }
+}
+
+/* ======================================================================
+   DEMO DATA — sample chats matching the Telegram screenshots
+   ====================================================================== */
+function formatTime(d) {
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+const chats = [
+  {
+    id: 'live', name: 'Live Room Chat', gradient: 'linear-gradient(135deg,#8e6cd6,#4d76a3)',
+    initials: '🔥', status: 'Firebase realtime', online: true,
+    preview: 'Connect below to start chatting', time: 'now', unread: 0, muted: false,
+    messages: []
+  }
+];
+
+let activeChatId = null;
+
+/* ======================================================================
+   RENDERING
+   ====================================================================== */
+const chatListEl = document.getElementById('chat-list');
+const messagesEl = document.getElementById('messages');
+const emptyStateEl = document.getElementById('empty-state');
+const inputPanelEl = document.getElementById('input-panel');
+const chatHeaderName = document.getElementById('chat-header-name');
+const chatHeaderStatus = document.getElementById('chat-header-status');
+const chatHeaderAvatar = document.getElementById('chat-header-avatar');
+const appEl = document.getElementById('app');
+
+function avatarHtml(chat, size) {
+  return `<div class="avatar" style="background:${chat.gradient}">${chat.initials}</div>`;
+}
+
+function renderChatList(filter = '') {
+  const f = filter.trim().toLowerCase();
+  chatListEl.innerHTML = '';
+  chats
+    .filter(c => c.name.toLowerCase().includes(f))
+    .forEach(chat => {
+      const div = document.createElement('div');
+      div.className = 'chat-item' + (chat.id === activeChatId ? ' active' : '');
+      div.dataset.id = chat.id;
+      const badge = chat.unread > 0
+        ? `<div class="unread-badge${chat.muted ? ' muted' : ''}">${formatBadge(chat.unread)}</div>`
+        : '';
+      div.innerHTML = `
+        ${avatarHtml(chat)}
+        <div class="chat-info">
+          <div class="chat-row-top">
+            <span class="chat-name">${escapeHtml(chat.name)}</span>
+            <span class="chat-time">${chat.time}</span>
+          </div>
+          <div class="chat-row-bottom">
+            <span class="chat-preview">${escapeHtml(chat.preview)}</span>
+            ${badge}
+          </div>
+        </div>`;
+      div.addEventListener('click', () => openChat(chat.id));
+      chatListEl.appendChild(div);
+    });
+}
+
+function formatBadge(n) {
+  if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+  return n;
+}
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+// Cache of decrypted object URLs per message id, so we don't re-download
+// and re-decrypt the same file every time the message list re-renders.
+const mediaCache = new Map();
+
+function renderMessages(chat) {
+  messagesEl.innerHTML = '';
+  chat.messages.forEach(m => {
+    const row = document.createElement('div');
+    row.className = 'msg-row ' + (m.out ? 'out' : 'in');
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+
+    if (m.kind === 'image' || m.kind === 'video' || m.kind === 'voice') {
+      bubble.classList.add('media-bubble');
+      if (m.broken || !m.url) {
+        bubble.innerHTML = `<span class="bubble-text">🔒 Не удалось расшифровать (неверный ключ?)</span>`;
+      } else {
+        const holder = document.createElement('div');
+        holder.className = 'media-holder';
+        holder.innerHTML = `<span class="media-loading">⏳ Загрузка…</span>`;
+        bubble.appendChild(holder);
+        loadMediaInto(m, holder);
+      }
+      const meta = document.createElement('span');
+      meta.className = 'bubble-meta';
+      meta.innerHTML = m.time + (m.out ? readTickSvg() : '');
+      bubble.appendChild(meta);
+    } else {
+      bubble.innerHTML = `<span class="bubble-text">${escapeHtml(m.text)}</span>
+        <span class="bubble-meta">${m.time}${m.out ? readTickSvg() : ''}</span>`;
+    }
+
+    row.appendChild(bubble);
+    messagesEl.appendChild(row);
+  });
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+// Fetches the (still-encrypted) file from its Catbox URL, decrypts it
+// client-side with the room key, and renders the right element for it.
+async function loadMediaInto(msg, holderEl) {
+  if (mediaCache.has(msg.id)) {
+    renderMediaElement(msg, holderEl, mediaCache.get(msg.id));
+    return;
+  }
+  try {
+    const resp = await fetch(msg.url);
+    if (!resp.ok) throw new Error('fetch failed: ' + resp.status);
+    const cipherBuf = await resp.arrayBuffer();
+    const plainBuf = await decryptBytes(currentKey, msg.fileIv, cipherBuf);
+    if (!plainBuf) { holderEl.innerHTML = '🔒 Не удалось расшифровать файл'; return; }
+    const objectUrl = URL.createObjectURL(new Blob([plainBuf], { type: msg.mime }));
+    mediaCache.set(msg.id, objectUrl);
+    renderMediaElement(msg, holderEl, objectUrl);
+  } catch (e) {
+    console.error(e);
+    holderEl.innerHTML = '⚠️ Не удалось загрузить файл';
+  }
+}
+
+function renderMediaElement(msg, holderEl, objectUrl) {
+  holderEl.innerHTML = '';
+  if (msg.kind === 'image') {
+    const img = document.createElement('img');
+    img.src = objectUrl;
+    img.className = 'media-content';
+    img.addEventListener('click', () => window.open(objectUrl, '_blank'));
+    holderEl.appendChild(img);
+  } else if (msg.kind === 'video') {
+    const vid = document.createElement('video');
+    vid.src = objectUrl;
+    vid.controls = true;
+    vid.className = 'media-content';
+    holderEl.appendChild(vid);
+  } else if (msg.kind === 'voice') {
+    holderEl.appendChild(buildVoicePlayer(objectUrl, msg.duration));
+  }
+}
+
+// Small custom play/pause + progress-bar UI backed by a hidden <audio>.
+function buildVoicePlayer(objectUrl, duration) {
+  const wrap = document.createElement('div');
+  wrap.className = 'voice-player';
+
+  const playBtn = document.createElement('button');
+  playBtn.className = 'voice-play-btn';
+  playBtn.innerHTML = playIconSvg();
+
+  const track = document.createElement('div');
+  track.className = 'voice-track';
+  const progress = document.createElement('div');
+  progress.className = 'voice-progress';
+  track.appendChild(progress);
+
+  const timeLabel = document.createElement('span');
+  timeLabel.className = 'voice-time';
+  timeLabel.textContent = formatDuration(duration);
+
+  const audio = new Audio(objectUrl);
+
+  playBtn.addEventListener('click', () => {
+    if (audio.paused) { audio.play(); playBtn.innerHTML = pauseIconSvg(); }
+    else { audio.pause(); playBtn.innerHTML = playIconSvg(); }
+  });
+  audio.addEventListener('timeupdate', () => {
+    const pct = audio.duration ? (audio.currentTime / audio.duration) * 100 : 0;
+    progress.style.width = pct + '%';
+    timeLabel.textContent = formatDuration(audio.duration - audio.currentTime || duration);
+  });
+  audio.addEventListener('ended', () => {
+    playBtn.innerHTML = playIconSvg();
+    progress.style.width = '0%';
+    timeLabel.textContent = formatDuration(duration);
+  });
+  track.addEventListener('click', (e) => {
+    if (!audio.duration) return;
+    const rect = track.getBoundingClientRect();
+    const pct = (e.clientX - rect.left) / rect.width;
+    audio.currentTime = pct * audio.duration;
+  });
+
+  wrap.appendChild(playBtn);
+  wrap.appendChild(track);
+  wrap.appendChild(timeLabel);
+  return wrap;
+}
+
+function formatDuration(sec) {
+  sec = Math.max(0, Math.round(sec || 0));
+  const m = Math.floor(sec / 60), s = sec % 60;
+  return m + ':' + String(s).padStart(2, '0');
+}
+
+function playIconSvg() {
+  return `<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>`;
+}
+function pauseIconSvg() {
+  return `<svg viewBox="0 0 24 24"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>`;
+}
+
+function readTickSvg() {
+  return `<svg viewBox="0 0 24 24"><path d="M18 7l-8.5 8.5L5 11" fill="none" stroke="currentColor" stroke-width="2"/></svg>`;
+}
+
+function openChat(id) {
+  activeChatId = id;
+  const chat = chats.find(c => c.id === id);
+  if (!chat) return;
+
+  // mark read
+  chat.unread = 0;
+
+  chatHeaderName.textContent = chat.name;
+  chatHeaderStatus.textContent = chat.status;
+  chatHeaderStatus.className = chat.online ? 'online' : '';
+  chatHeaderAvatar.style.background = chat.gradient;
+  chatHeaderAvatar.textContent = chat.initials;
+
+  emptyStateEl.style.display = 'none';
+  inputPanelEl.style.display = 'flex';
+  messagesEl.style.display = 'flex';
+
+  renderMessages(chat);
+  renderChatList(document.getElementById('search-input').value);
+
+  // mobile: slide to chat view
+  appEl.classList.add('chat-open');
+
+  if (id === 'live' && db) {
+    // already connected via room bar; nothing extra needed
+  }
+}
+
+document.getElementById('back-btn').addEventListener('click', () => {
+  appEl.classList.remove('chat-open');
+});
+
+document.getElementById('search-input').addEventListener('input', (e) => {
+  renderChatList(e.target.value);
+});
+
+/* ======================================================================
+   SENDING MESSAGES
+   ====================================================================== */
+const messageInput = document.getElementById('message-input');
+const sendBtn = document.getElementById('send-btn');
+
+function autoGrow() {
+  messageInput.style.height = 'auto';
+  messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + 'px';
+}
+messageInput.addEventListener('input', autoGrow);
+
+function handleSend() {
+  const text = messageInput.value.trim();
+  if (!text || !activeChatId) return;
+  const chat = chats.find(c => c.id === activeChatId);
+
+  if (chat.id === 'live') {
+    // Real Firebase-backed room
+    const roomId = document.getElementById('room-input').value.trim() || 'demo-room';
+    sendToFirebase(roomId, text);
+  } else {
+    // Local demo chat — just echo into the UI
+    chat.messages.push({ out: true, text, time: formatTime(new Date()) });
+    chat.preview = text;
+    chat.time = formatTime(new Date());
+    renderMessages(chat);
+    renderChatList(document.getElementById('search-input').value);
+  }
+
+  messageInput.value = '';
+  autoGrow();
+}
+
+sendBtn.addEventListener('click', handleSend);
+messageInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    handleSend();
+  }
+});
+
+/* ======================================================================
+   ATTACHMENTS — photo / video via Catbox (encrypted)
+   ====================================================================== */
+const attachBtn = document.getElementById('attach-btn');
+const fileInput = document.getElementById('file-input');
+
+attachBtn.addEventListener('click', () => fileInput.click());
+
+fileInput.addEventListener('change', async () => {
+  const file = fileInput.files[0];
+  fileInput.value = ''; // allow picking the same file again later
+  if (!file || !activeChatId) return;
+  const chat = chats.find(c => c.id === activeChatId);
+  if (chat.id !== 'live') return; // media only supported on the live Firebase room
+
+  const roomId = document.getElementById('room-input').value.trim() || 'demo-room';
+  const isVideo = file.type.startsWith('video/');
+  const kind = isVideo ? 'video' : 'image';
+
+  let blobToSend = file;
+  let mime = file.type || (isVideo ? 'video/mp4' : 'image/jpeg');
+  if (!isVideo) {
+    try {
+      blobToSend = await compressImage(file);
+      mime = 'image/jpeg';
+    } catch (e) {
+      console.warn('Image compression failed, sending original:', e);
+    }
+  }
+
+  sendMediaToFirebase(roomId, kind, blobToSend, mime);
+});
+
+/* ======================================================================
+   VOICE MESSAGES — record via MediaRecorder, send via Catbox (encrypted)
+   ====================================================================== */
+const micBtn = document.getElementById('mic-btn');
+const recordingBar = document.getElementById('recording-bar');
+const inputPanel = document.getElementById('input-panel');
+const recordingTimeEl = document.getElementById('recording-time');
+const recCancelBtn = document.getElementById('rec-cancel-btn');
+const recStopBtn = document.getElementById('rec-stop-btn');
+
+let mediaRecorder = null;
+let recordedChunks = [];
+let recordStartTime = 0;
+let recordTimerInterval = null;
+let recordCancelled = false;
+
+async function startRecording() {
+  if (!activeChatId || chats.find(c => c.id === activeChatId).id !== 'live') return;
+  if (!currentKey) { setConnStatus(false, 'Сначала подключитесь к комнате'); return; }
+
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (e) {
+    alert('Не удалось получить доступ к микрофону: ' + e.message);
+    return;
+  }
+
+  recordedChunks = [];
+  recordCancelled = false;
+  const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '';
+  mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+
+  mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
+  mediaRecorder.onstop = async () => {
+    stream.getTracks().forEach(t => t.stop());
+    clearInterval(recordTimerInterval);
+    inputPanel.style.display = 'flex';
+    recordingBar.style.display = 'none';
+
+    if (recordCancelled || recordedChunks.length === 0) return;
+
+    const durationSec = (Date.now() - recordStartTime) / 1000;
+    const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+    const roomId = document.getElementById('room-input').value.trim() || 'demo-room';
+    sendMediaToFirebase(roomId, 'voice', blob, blob.type, durationSec);
+  };
+
+  mediaRecorder.start();
+  recordStartTime = Date.now();
+  inputPanel.style.display = 'none';
+  recordingBar.style.display = 'flex';
+  recordingTimeEl.textContent = '0:00';
+  recordTimerInterval = setInterval(() => {
+    recordingTimeEl.textContent = formatDuration((Date.now() - recordStartTime) / 1000);
+  }, 250);
+}
+
+function stopRecording(cancelled) {
+  recordCancelled = cancelled;
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+}
+
+micBtn.addEventListener('click', startRecording);
+recStopBtn.addEventListener('click', () => stopRecording(false));
+recCancelBtn.addEventListener('click', () => stopRecording(true));
+
+/* ======================================================================
+   ROOM / FIREBASE CONNECTION BAR
+   ====================================================================== */
+document.getElementById('room-join-btn').addEventListener('click', () => {
+  const roomId = document.getElementById('room-input').value.trim() || 'demo-room';
+  const passphrase = document.getElementById('passphrase-input').value;
+  connectToRoom(roomId, passphrase);
+  if (activeChatId !== 'live') openChat('live');
+});
+
+/* ======================================================================
+   INIT
+   ====================================================================== */
+renderChatList();
+openChat('live');
+appEl.classList.remove('chat-open'); // stay on chat list first on mobile until user taps it
+// Try to init Firebase silently on load (won't connect until user hits "Connect")
+initFirebase();
+</script>
+</body>
+</html>
