@@ -411,6 +411,7 @@
     padding: 6px 10px;
     min-width: 220px;
   }
+  .voice-note-icon{ font-size:16px; line-height:1; margin-right:2px; flex-shrink:0; }
   .voice-play-btn{
     width: 36px; height:36px;
     border-radius:50%;
@@ -565,7 +566,7 @@
       <button class="icon-btn" id="attach-btn" title="Прикрепить фото/видео">
         <svg viewBox="0 0 24 24"><path d="M16.5 6v11.5a4 4 0 0 1-8 0V5a2.5 2.5 0 0 1 5 0v10.5a1 1 0 0 1-2 0V6H10v9.5a2.5 2.5 0 0 0 5 0V5a4 4 0 0 0-8 0v12.5a5.5 5.5 0 0 0 11 0V6z"/></svg>
       </button>
-      <input type="file" id="file-input" accept="image/*,video/*" style="display:none">
+      <input type="file" id="file-input" accept="image/*,video/*,audio/*" style="display:none">
       <textarea id="message-input" placeholder="Write a message..." rows="1"></textarea>
       <button class="icon-btn" id="mic-btn" title="Голосовое сообщение">
         <svg viewBox="0 0 24 24"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11z"/></svg>
@@ -855,7 +856,7 @@ async function connectToRoom(roomId, passphrase) {
       const out = raw.sender === DEVICE_ID;
       const time = formatTime(raw.createdAt ? raw.createdAt.toDate() : new Date());
 
-      if (raw.kind === 'image' || raw.kind === 'video' || raw.kind === 'voice') {
+      if (raw.kind === 'image' || raw.kind === 'video' || raw.kind === 'voice' || raw.kind === 'audio') {
         const url = await decryptMessage(currentKey, raw.linkIv, raw.linkData);
         return {
           id: d.id, out, time, kind: raw.kind,
@@ -880,6 +881,7 @@ async function connectToRoom(roomId, passphrase) {
       liveChat.preview = last.kind === 'text' ? last.text
         : last.kind === 'image' ? '📷 Фото'
         : last.kind === 'video' ? '🎥 Видео'
+        : last.kind === 'audio' ? '🎵 Аудио'
         : '🎤 Голосовое сообщение';
       renderChatList();
     }
@@ -1024,7 +1026,7 @@ function renderMessages(chat) {
     const bubble = document.createElement('div');
     bubble.className = 'bubble';
 
-    if (m.kind === 'image' || m.kind === 'video' || m.kind === 'voice') {
+    if (m.kind === 'image' || m.kind === 'video' || m.kind === 'voice' || m.kind === 'audio') {
       bubble.classList.add('media-bubble');
       if (m.broken || !m.url) {
         bubble.innerHTML = `<span class="bubble-text">🔒 Не удалось расшифровать (неверный ключ?)</span>`;
@@ -1086,15 +1088,24 @@ function renderMediaElement(msg, holderEl, objectUrl) {
     vid.controls = true;
     vid.className = 'media-content';
     holderEl.appendChild(vid);
-  } else if (msg.kind === 'voice') {
-    holderEl.appendChild(buildVoicePlayer(objectUrl, msg.duration));
+  } else if (msg.kind === 'voice' || msg.kind === 'audio') {
+    holderEl.appendChild(buildVoicePlayer(objectUrl, msg.duration, msg.kind === 'audio'));
   }
 }
 
 // Small custom play/pause + progress-bar UI backed by a hidden <audio>.
-function buildVoicePlayer(objectUrl, duration) {
+// Reused for both recorded voice notes and uploaded audio files (mp3 etc);
+// isSong just swaps the icon so the two are visually distinguishable.
+function buildVoicePlayer(objectUrl, duration, isSong = false) {
   const wrap = document.createElement('div');
   wrap.className = 'voice-player';
+
+  if (isSong) {
+    const noteIcon = document.createElement('span');
+    noteIcon.className = 'voice-note-icon';
+    noteIcon.textContent = '🎵';
+    wrap.appendChild(noteIcon);
+  }
 
   const playBtn = document.createElement('button');
   playBtn.className = 'voice-play-btn';
@@ -1252,11 +1263,23 @@ fileInput.addEventListener('change', async () => {
 
   const roomId = document.getElementById('room-input').value.trim() || 'demo-room';
   const isVideo = file.type.startsWith('video/');
-  const kind = isVideo ? 'video' : 'image';
+  const isAudio = !isVideo && file.type.startsWith('audio/');
+  const kind = isVideo ? 'video' : isAudio ? 'audio' : 'image';
 
   let blobToSend = file;
-  let mime = file.type || (isVideo ? 'video/mp4' : 'image/jpeg');
-  if (!isVideo) {
+  let mime = file.type || (isVideo ? 'video/mp4' : isAudio ? 'audio/mpeg' : 'image/jpeg');
+  let duration = 0;
+
+  if (isAudio) {
+    // Read the track length client-side before it's encrypted+uploaded,
+    // purely so the player can show a duration/progress bar — the file
+    // itself is sent as-is (no re-encoding, so quality is untouched).
+    try {
+      duration = await readMediaDuration(file);
+    } catch (e) {
+      console.warn('Could not read audio duration:', e);
+    }
+  } else if (!isVideo) {
     try {
       blobToSend = await compressImage(file);
       mime = 'image/jpeg';
@@ -1265,8 +1288,27 @@ fileInput.addEventListener('change', async () => {
     }
   }
 
-  sendMediaToFirebase(roomId, kind, blobToSend, mime);
+  sendMediaToFirebase(roomId, kind, blobToSend, mime, duration);
 });
+
+// Loads a local audio/video File just far enough to read its duration,
+// without uploading or playing anything.
+function readMediaDuration(file) {
+  return new Promise((resolve, reject) => {
+    const el = document.createElement('audio');
+    const objectUrl = URL.createObjectURL(file);
+    el.preload = 'metadata';
+    el.addEventListener('loadedmetadata', () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(el.duration || 0);
+    });
+    el.addEventListener('error', () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('failed to read duration'));
+    });
+    el.src = objectUrl;
+  });
+}
 
 /* ======================================================================
    VOICE MESSAGES — record via MediaRecorder, send via Catbox (encrypted)
