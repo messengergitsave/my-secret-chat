@@ -17,7 +17,7 @@
     --bubble-in: #182533;
     --accent: #5288c1;
     --accent-purple: #8e6cd6;
-    --text-primary: #ffffff; 
+    --text-primary: #ffffff;
     --text-secondary: #6c7883;
     --text-time: #7d8b99;
     --border-color: #0f1621;
@@ -326,6 +326,37 @@
     z-index: 2;
     border-top: 1px solid var(--border-color);
   }
+  .attach-wrap{ position: relative; }
+  .attach-menu{
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 0;
+    background: var(--bg-hover);
+    border-radius: 10px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.35);
+    padding: 6px;
+    min-width: 190px;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+  }
+  .attach-menu-item{
+    display:flex;
+    align-items:center;
+    gap: 12px;
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    padding: 10px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14.5px;
+    text-align: left;
+    white-space: nowrap;
+  }
+  .attach-menu-item:hover{ background: rgba(255,255,255,0.08); }
+  .attach-menu-icon{ display:flex; width:20px; height:20px; flex-shrink:0; }
+  .attach-menu-icon svg{ width:20px; height:20px; fill: var(--accent); }
   #message-input{
     flex:1;
     background: transparent;
@@ -404,21 +435,6 @@
     margin: 4px 6px 2px 0;
   }
 
-  .voice-player-outer{
-    display:flex;
-    flex-direction:column;
-    min-width: 220px;
-  }
-  .voice-track-name{
-    font-size: 12.5px;
-    font-weight:600;
-    color: rgba(255,255,255,0.9);
-    padding: 6px 10px 0 10px;
-    overflow:hidden;
-    text-overflow:ellipsis;
-    white-space:nowrap;
-    max-width: 240px;
-  }
   .voice-player{
     display:flex;
     align-items:center;
@@ -456,6 +472,76 @@
     color: rgba(255,255,255,0.75);
     min-width: 32px;
     text-align:right;
+  }
+
+  .song-player{
+    display:flex;
+    align-items:center;
+    gap: 10px;
+    padding: 8px 10px;
+    min-width: 240px;
+    max-width: 280px;
+  }
+  .song-avatar{
+    width: 44px; height:44px;
+    border-radius:50%;
+    border:none;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+    flex-shrink:0;
+  }
+  .song-avatar svg{ width:20px; height:20px; fill:#fff; }
+  .song-info{
+    flex:1;
+    min-width:0;
+    display:flex;
+    flex-direction:column;
+    gap: 4px;
+  }
+  .song-top-row{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    gap: 8px;
+  }
+  .song-name{
+    font-size: 14px;
+    font-weight:600;
+    color:#fff;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    min-width:0;
+  }
+  .song-bitrate{
+    font-size: 11.5px;
+    color: rgba(255,255,255,0.6);
+    flex-shrink:0;
+  }
+  .song-track{
+    height:4px;
+    background: rgba(255,255,255,0.25);
+    border-radius:2px;
+    position:relative;
+    cursor:pointer;
+  }
+  .song-progress{
+    position:absolute; left:0; top:0; bottom:0;
+    width:0%;
+    background:#fff;
+    border-radius:2px;
+  }
+  .song-progress-dot{
+    position:absolute;
+    right:-4px; top:50%;
+    width:9px; height:9px;
+    background:#fff;
+    border-radius:50%;
+    transform: translateY(-50%);
+  }
+  .song-time{
+    font-size: 11.5px;
+    color: rgba(255,255,255,0.6);
   }
 
   /* ============ RECORDING BAR ============ */
@@ -764,9 +850,25 @@
     <div class="empty-state" id="empty-state">Select a chat to start messaging</div>
 
     <div id="input-panel" style="display:none;">
-      <button class="icon-btn" id="attach-btn" title="Прикрепить фото/видео">
-        <svg viewBox="0 0 24 24"><path d="M16.5 6v11.5a4 4 0 0 1-8 0V5a2.5 2.5 0 0 1 5 0v10.5a1 1 0 0 1-2 0V6H10v9.5a2.5 2.5 0 0 0 5 0V5a4 4 0 0 0-8 0v12.5a5.5 5.5 0 0 0 11 0V6z"/></svg>
-      </button>
+      <div class="attach-wrap">
+        <button class="icon-btn" id="attach-btn" title="Прикрепить">
+          <svg viewBox="0 0 24 24"><path d="M16.5 6v11.5a4 4 0 0 1-8 0V5a2.5 2.5 0 0 1 5 0v10.5a1 1 0 0 1-2 0V6H10v9.5a2.5 2.5 0 0 0 5 0V5a4 4 0 0 0-8 0v12.5a5.5 5.5 0 0 0 11 0V6z"/></svg>
+        </button>
+        <div class="attach-menu" id="attach-menu" style="display:none;">
+          <button class="attach-menu-item" id="attach-media-btn">
+            <span class="attach-menu-icon">
+              <svg viewBox="0 0 24 24"><path d="M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+            </span>
+            <span>Фото или видео</span>
+          </button>
+          <button class="attach-menu-item" id="attach-song-btn">
+            <span class="attach-menu-icon">
+              <svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0zm12-2a3 3 0 1 1-6 0 3 3 0 0 1 6 0z" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+            </span>
+            <span>Песня</span>
+          </button>
+        </div>
+      </div>
       <input type="file" id="file-input" accept="image/*,video/*,audio/*,.mp3" style="display:none">
       <textarea id="message-input" placeholder="Write a message..." rows="1"></textarea>
       <button class="icon-btn" id="mic-btn" title="Голосовое сообщение">
@@ -1089,7 +1191,7 @@ function subscribeChatMessages(chat) {
         return {
           id: d.id, out, time, kind: raw.kind,
           url, fileIv: raw.fileIv, mime: raw.mime, duration: raw.duration || 0,
-          name: name || '', broken: url === null
+          bitrate: raw.bitrate || 0, name: name || '', broken: url === null
         };
       }
 
@@ -1151,7 +1253,7 @@ async function sendToFirebase(chat, text) {
 // bytes, upload the ciphertext blob to Catbox (blind storage — Catbox
 // never sees the real content), then encrypt the returned link and
 // write a message doc pointing at it.
-async function sendMediaToFirebase(chat, kind, fileBlob, mime, duration = 0, name = '') {
+async function sendMediaToFirebase(chat, kind, fileBlob, mime, duration = 0, name = '', bitrate = 0) {
   if (!db || !chat || !chat.key) {
     setConnStatus(false, 'Сначала подключитесь к комнате (Room ID + фраза)');
     return;
@@ -1173,7 +1275,7 @@ async function sendMediaToFirebase(chat, kind, fileBlob, mime, duration = 0, nam
     }
 
     await addDoc(collection(db, 'rooms', chat.roomId, 'messages'), {
-      kind, linkIv, linkData, fileIv, mime, duration, nameIv, nameData,
+      kind, linkIv, linkData, fileIv, mime, duration, nameIv, nameData, bitrate,
       sender: DEVICE_ID,
       createdAt: serverTimestamp()
     });
@@ -1395,25 +1497,14 @@ function renderMediaElement(msg, holderEl, objectUrl) {
   } else if (msg.kind === 'voice') {
     holderEl.appendChild(buildVoicePlayer(objectUrl, msg.duration));
   } else if (msg.kind === 'audio') {
-    holderEl.appendChild(buildVoicePlayer(objectUrl, msg.duration, msg.name || '🎵 Аудио'));
+    holderEl.appendChild(buildSongPlayer(objectUrl, msg.duration, msg.name || 'Аудио', msg.bitrate));
   }
 }
 
 // Small custom play/pause + progress-bar UI backed by a hidden <audio>.
-function buildVoicePlayer(objectUrl, duration, trackName = '') {
-  const outer = document.createElement('div');
-  outer.className = 'voice-player-outer';
-
-  if (trackName) {
-    const label = document.createElement('div');
-    label.className = 'voice-track-name';
-    label.textContent = trackName;
-    outer.appendChild(label);
-  }
-
+function buildVoicePlayer(objectUrl, duration) {
   const wrap = document.createElement('div');
   wrap.className = 'voice-player';
-  outer.appendChild(wrap);
 
   const playBtn = document.createElement('button');
   playBtn.className = 'voice-play-btn';
@@ -1455,13 +1546,86 @@ function buildVoicePlayer(objectUrl, duration, trackName = '') {
   wrap.appendChild(playBtn);
   wrap.appendChild(track);
   wrap.appendChild(timeLabel);
-  return outer;
+  return wrap;
 }
 
 function formatDuration(sec) {
   sec = Math.max(0, Math.round(sec || 0));
   const m = Math.floor(sec / 60), s = sec % 60;
   return m + ':' + String(s).padStart(2, '0');
+}
+
+// Telegram-style "song" attachment player: round avatar with play/pause,
+// track name + bitrate on top, a scrub bar, and elapsed/total time below —
+// distinct from the plainer voice-note player above.
+function buildSongPlayer(objectUrl, duration, trackName, bitrateKbps) {
+  const wrap = document.createElement('div');
+  wrap.className = 'song-player';
+
+  const avatar = document.createElement('button');
+  avatar.className = 'song-avatar';
+  avatar.style.background = avatarFor(trackName || 'Track').gradient;
+  avatar.innerHTML = playIconSvg();
+
+  const info = document.createElement('div');
+  info.className = 'song-info';
+
+  const topRow = document.createElement('div');
+  topRow.className = 'song-top-row';
+  const nameEl = document.createElement('span');
+  nameEl.className = 'song-name';
+  nameEl.textContent = trackName || 'Аудио';
+  topRow.appendChild(nameEl);
+  if (bitrateKbps) {
+    const bitrateEl = document.createElement('span');
+    bitrateEl.className = 'song-bitrate';
+    bitrateEl.textContent = bitrateKbps + 'kbps';
+    topRow.appendChild(bitrateEl);
+  }
+
+  const track = document.createElement('div');
+  track.className = 'song-track';
+  const progress = document.createElement('div');
+  progress.className = 'song-progress';
+  const dot = document.createElement('div');
+  dot.className = 'song-progress-dot';
+  progress.appendChild(dot);
+  track.appendChild(progress);
+
+  const timeLabel = document.createElement('div');
+  timeLabel.className = 'song-time';
+  timeLabel.textContent = formatDuration(0) + ' / ' + formatDuration(duration);
+
+  info.appendChild(topRow);
+  info.appendChild(track);
+  info.appendChild(timeLabel);
+  wrap.appendChild(avatar);
+  wrap.appendChild(info);
+
+  const audio = new Audio(objectUrl);
+
+  avatar.addEventListener('click', () => {
+    if (audio.paused) { audio.play(); avatar.innerHTML = pauseIconSvg(); }
+    else { audio.pause(); avatar.innerHTML = playIconSvg(); }
+  });
+  audio.addEventListener('timeupdate', () => {
+    const pct = audio.duration ? (audio.currentTime / audio.duration) * 100 : 0;
+    progress.style.width = pct + '%';
+    timeLabel.textContent = formatDuration(audio.currentTime) + ' / ' + formatDuration(audio.duration || duration);
+  });
+  audio.addEventListener('ended', () => {
+    avatar.innerHTML = playIconSvg();
+    progress.style.width = '0%';
+    timeLabel.textContent = formatDuration(0) + ' / ' + formatDuration(duration);
+  });
+  track.addEventListener('click', (e) => {
+    if (!audio.duration) return;
+    const rect = track.getBoundingClientRect();
+    const pct = (e.clientX - rect.left) / rect.width;
+    audio.currentTime = pct * audio.duration;
+  });
+
+  return wrap;
 }
 
 function playIconSvg() {
@@ -1558,19 +1722,49 @@ messageInput.addEventListener('keydown', (e) => {
    ATTACHMENTS — photo / video via Catbox (encrypted)
    ====================================================================== */
 const attachBtn = document.getElementById('attach-btn');
+const attachMenu = document.getElementById('attach-menu');
+const attachMediaBtn = document.getElementById('attach-media-btn');
+const attachSongBtn = document.getElementById('attach-song-btn');
 const fileInput = document.getElementById('file-input');
 
-attachBtn.addEventListener('click', () => fileInput.click());
+function closeAttachMenu() { attachMenu.style.display = 'none'; }
+function toggleAttachMenu() {
+  attachMenu.style.display = (attachMenu.style.display === 'none') ? 'flex' : 'none';
+}
+
+attachBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  toggleAttachMenu();
+});
+document.addEventListener('click', (e) => {
+  if (attachMenu.style.display !== 'none' && !attachMenu.contains(e.target) && e.target !== attachBtn) {
+    closeAttachMenu();
+  }
+});
+
+attachMediaBtn.addEventListener('click', () => {
+  fileInput.accept = 'image/*,video/*';
+  fileInput.dataset.pickerKind = 'media';
+  closeAttachMenu();
+  fileInput.click();
+});
+attachSongBtn.addEventListener('click', () => {
+  fileInput.accept = 'audio/*,.mp3,.m4a,.wav,.ogg,.flac';
+  fileInput.dataset.pickerKind = 'song';
+  closeAttachMenu();
+  fileInput.click();
+});
 
 fileInput.addEventListener('change', async () => {
   const file = fileInput.files[0];
+  const pickerKind = fileInput.dataset.pickerKind;
   fileInput.value = ''; // allow picking the same file again later
   if (!file || !activeChatId) return;
   const chat = chats.find(c => c.id === activeChatId);
   if (!chat || chat.locked) return; // media only supported on unlocked Firebase-backed chats
 
-  const isVideo = file.type.startsWith('video/');
-  const isAudio = file.type.startsWith('audio/') || /\.(mp3|m4a|wav|ogg|flac)$/i.test(file.name);
+  const isVideo = pickerKind === 'media' && file.type.startsWith('video/');
+  const isAudio = pickerKind === 'song' || (pickerKind !== 'media' && (file.type.startsWith('audio/') || /\.(mp3|m4a|wav|ogg|flac)$/i.test(file.name)));
   const kind = isVideo ? 'video' : isAudio ? 'audio' : 'image';
 
   let blobToSend = file;
@@ -1585,11 +1779,19 @@ fileInput.addEventListener('change', async () => {
   }
 
   let duration = 0;
+  let bitrate = 0;
   if (isAudio) {
-    try { duration = await readAudioDuration(file); } catch (e) { console.warn('Could not read track duration:', e); }
+    try {
+      duration = await readAudioDuration(file);
+      // Rough encoded bitrate estimate from file size / duration — good
+      // enough for a "320kbps"-style label, not meant to be exact.
+      if (duration > 0) bitrate = Math.round((file.size * 8) / duration / 1000);
+    } catch (e) {
+      console.warn('Could not read track duration:', e);
+    }
   }
 
-  sendMediaToFirebase(chat, kind, blobToSend, mime, duration, isAudio ? file.name : '');
+  sendMediaToFirebase(chat, kind, blobToSend, mime, duration, isAudio ? file.name : '', bitrate);
 });
 
 // Reads a local audio file's duration (seconds) via a throwaway <audio>
