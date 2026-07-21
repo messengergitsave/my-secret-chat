@@ -685,6 +685,33 @@
     border:none; border-radius:6px; padding:6px 12px; background:#e05c5c; color:#fff;
     font-weight:600; cursor:pointer; font-size:12px;
   }
+
+  /* ================= MINI SONG BAR (under chat header) ================= */
+  #song-bar{
+    display:flex; align-items:center; gap:10px; padding:6px 14px;
+    background: rgba(124,108,224,.12); border-bottom:1px solid rgba(124,108,224,.3);
+    font-size:13px;
+  }
+  #song-bar-play{
+    flex-shrink:0; width:28px; height:28px; border-radius:50%;
+    background:var(--accent,#4d76a3); display:flex; align-items:center; justify-content:center;
+    border:none; cursor:pointer; padding:0;
+  }
+  #song-bar-play svg{ width:15px; height:15px; fill:#fff; }
+  #song-bar-info{ flex:1; min-width:0; display:flex; flex-direction:column; justify-content:center; gap:3px; }
+  #song-bar-name{ font-size:12.5px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #song-bar-track{ height:4px; border-radius:2px; background:rgba(255,255,255,.12); cursor:pointer; position:relative; }
+  #song-bar-progress{ height:100%; width:0%; border-radius:2px; background:var(--accent,#4d76a3); position:relative; }
+  #song-bar-dot{
+    position:absolute; right:-4px; top:50%; transform:translateY(-50%);
+    width:9px; height:9px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.4);
+  }
+  #song-bar-time{ flex-shrink:0; font-size:11.5px; color:var(--text-secondary,#8a9ba8); }
+  #song-bar-close{
+    flex-shrink:0; width:22px; height:22px; border-radius:50%; border:none; cursor:pointer;
+    background:rgba(255,255,255,.08); color:var(--text-secondary,#8a9ba8); font-size:12px;
+    display:flex; align-items:center; justify-content:center; padding:0;
+  }
   #incoming-call-overlay{
     position:fixed; inset:0; z-index:60; background:rgba(0,0,0,.6);
     display:flex; align-items:center; justify-content:center; padding:16px;
@@ -844,6 +871,18 @@
       <button id="call-hangup-btn" title="Завершить звонок">Завершить</button>
     </div>
     <audio id="remote-audio" autoplay></audio>
+
+    <div id="song-bar" style="display:none;">
+      <button id="song-bar-play" class="icon-btn" title="Play/Pause"></button>
+      <div id="song-bar-info">
+        <div id="song-bar-name"></div>
+        <div id="song-bar-track">
+          <div id="song-bar-progress"><div id="song-bar-dot"></div></div>
+        </div>
+      </div>
+      <span id="song-bar-time"></span>
+      <button id="song-bar-close" class="icon-btn" title="Остановить">✕</button>
+    </div>
 
     <div id="messages"></div>
 
@@ -1378,6 +1417,108 @@ const chatHeaderAvatar = document.getElementById('chat-header-avatar');
 const callBtn = document.getElementById('call-btn');
 const appEl = document.getElementById('app');
 
+const songBarEl = document.getElementById('song-bar');
+const songBarPlayBtn = document.getElementById('song-bar-play');
+const songBarName = document.getElementById('song-bar-name');
+const songBarTrackEl = document.getElementById('song-bar-track');
+const songBarProgress = document.getElementById('song-bar-progress');
+const songBarTime = document.getElementById('song-bar-time');
+const songBarClose = document.getElementById('song-bar-close');
+
+// Single shared <audio> so only one song can ever play at once, plus a
+// registry of per-message UI bits (bubble avatar/progress/time) keyed by
+// message id, so both the bubble and the mini bar under the header stay
+// in sync no matter which one triggered play/pause/seek.
+const songPlayer = {
+  audio: new Audio(),
+  currentId: null,
+  currentName: '',
+  currentDuration: 0,
+  els: new Map(), // msgId -> { avatarBtn, progress, timeLabel }
+};
+
+function updateSongUI() {
+  const a = songPlayer.audio;
+  const playing = !a.paused && !a.ended;
+  const cur = a.currentTime || 0;
+  const dur = a.duration || songPlayer.currentDuration || 0;
+  const pct = dur ? (cur / dur) * 100 : 0;
+
+  // Bubble in the message list (if the message with the currently
+  // playing song is still mounted).
+  const el = songPlayer.currentId ? songPlayer.els.get(songPlayer.currentId) : null;
+  if (el) {
+    el.avatarBtn.innerHTML = playing ? pauseIconSvg() : playIconSvg();
+    el.progress.style.width = pct + '%';
+    el.timeLabel.textContent = formatDuration(cur) + ' / ' + formatDuration(dur || songPlayer.currentDuration);
+  }
+
+  // Mini bar under the chat header.
+  if (songPlayer.currentId) {
+    songBarEl.style.display = 'flex';
+    songBarPlayBtn.innerHTML = playing ? pauseIconSvg() : playIconSvg();
+    songBarName.textContent = songPlayer.currentName || 'Аудио';
+    songBarProgress.style.width = pct + '%';
+    songBarTime.textContent = formatDuration(cur) + ' / ' + formatDuration(dur || songPlayer.currentDuration);
+  } else {
+    songBarEl.style.display = 'none';
+  }
+}
+
+function playSong(id, objectUrl, duration, name) {
+  const a = songPlayer.audio;
+  if (songPlayer.currentId === id) {
+    // Same track already loaded — just toggle play/pause.
+    if (a.paused) a.play(); else a.pause();
+    return;
+  }
+  // Switching to a different track: stop whatever was playing, reset its
+  // bubble UI, then load and play the new one.
+  const prevEl = songPlayer.currentId ? songPlayer.els.get(songPlayer.currentId) : null;
+  if (prevEl) {
+    prevEl.avatarBtn.innerHTML = playIconSvg();
+    prevEl.progress.style.width = '0%';
+  }
+  songPlayer.currentId = id;
+  songPlayer.currentName = name;
+  songPlayer.currentDuration = duration;
+  a.src = objectUrl;
+  a.currentTime = 0;
+  a.play();
+}
+
+function stopSong() {
+  const a = songPlayer.audio;
+  a.pause();
+  a.currentTime = 0;
+  const el = songPlayer.currentId ? songPlayer.els.get(songPlayer.currentId) : null;
+  if (el) { el.avatarBtn.innerHTML = playIconSvg(); el.progress.style.width = '0%'; el.timeLabel.textContent = formatDuration(0) + ' / ' + formatDuration(songPlayer.currentDuration); }
+  songPlayer.currentId = null;
+  updateSongUI();
+}
+
+songPlayer.audio.addEventListener('timeupdate', updateSongUI);
+songPlayer.audio.addEventListener('play', updateSongUI);
+songPlayer.audio.addEventListener('pause', updateSongUI);
+songPlayer.audio.addEventListener('ended', () => {
+  const el = songPlayer.currentId ? songPlayer.els.get(songPlayer.currentId) : null;
+  if (el) { el.progress.style.width = '0%'; el.timeLabel.textContent = formatDuration(0) + ' / ' + formatDuration(songPlayer.currentDuration); }
+  updateSongUI();
+});
+
+songBarPlayBtn.addEventListener('click', () => {
+  const a = songPlayer.audio;
+  if (a.paused) a.play(); else a.pause();
+});
+songBarClose.addEventListener('click', stopSong);
+songBarTrackEl.addEventListener('click', (e) => {
+  const a = songPlayer.audio;
+  if (!a.duration) return;
+  const rect = songBarTrackEl.getBoundingClientRect();
+  const pct = (e.clientX - rect.left) / rect.width;
+  a.currentTime = Math.max(0, Math.min(1, pct)) * a.duration;
+});
+
 function avatarHtml(chat, size) {
   return `<div class="avatar" style="background:${chat.gradient}">${chat.initials}</div>`;
 }
@@ -1497,7 +1638,7 @@ function renderMediaElement(msg, holderEl, objectUrl) {
   } else if (msg.kind === 'voice') {
     holderEl.appendChild(buildVoicePlayer(objectUrl, msg.duration));
   } else if (msg.kind === 'audio') {
-    holderEl.appendChild(buildSongPlayer(objectUrl, msg.duration, msg.name || 'Аудио', msg.bitrate));
+    holderEl.appendChild(buildSongPlayer(msg, objectUrl));
   }
 }
 
@@ -1558,14 +1699,17 @@ function formatDuration(sec) {
 // Telegram-style "song" attachment player: round avatar with play/pause,
 // track name + bitrate on top, a scrub bar, and elapsed/total time below —
 // distinct from the plainer voice-note player above.
-function buildSongPlayer(objectUrl, duration, trackName, bitrateKbps) {
+function buildSongPlayer(msg, objectUrl) {
+  const duration = msg.duration;
+  const trackName = msg.name || 'Аудио';
+  const bitrateKbps = msg.bitrate;
+
   const wrap = document.createElement('div');
   wrap.className = 'song-player';
 
   const avatar = document.createElement('button');
   avatar.className = 'song-avatar';
   avatar.style.background = avatarFor(trackName || 'Track').gradient;
-  avatar.innerHTML = playIconSvg();
 
   const info = document.createElement('div');
   info.className = 'song-info';
@@ -1594,7 +1738,6 @@ function buildSongPlayer(objectUrl, duration, trackName, bitrateKbps) {
 
   const timeLabel = document.createElement('div');
   timeLabel.className = 'song-time';
-  timeLabel.textContent = formatDuration(0) + ' / ' + formatDuration(duration);
 
   info.appendChild(topRow);
   info.appendChild(track);
@@ -1602,27 +1745,31 @@ function buildSongPlayer(objectUrl, duration, trackName, bitrateKbps) {
   wrap.appendChild(avatar);
   wrap.appendChild(info);
 
-  const audio = new Audio(objectUrl);
+  // Register this bubble's elements so the shared player can update it
+  // (and the mini bar under the header) no matter which one is playing.
+  songPlayer.els.set(msg.id, { avatarBtn: avatar, progress, timeLabel });
 
-  avatar.addEventListener('click', () => {
-    if (audio.paused) { audio.play(); avatar.innerHTML = pauseIconSvg(); }
-    else { audio.pause(); avatar.innerHTML = playIconSvg(); }
-  });
-  audio.addEventListener('timeupdate', () => {
-    const pct = audio.duration ? (audio.currentTime / audio.duration) * 100 : 0;
+  // Reflect current state immediately (e.g. if this bubble re-renders
+  // while its own track is already playing elsewhere on screen).
+  if (songPlayer.currentId === msg.id) {
+    const a = songPlayer.audio;
+    const playing = !a.paused && !a.ended;
+    avatar.innerHTML = playing ? pauseIconSvg() : playIconSvg();
+    const pct = a.duration ? (a.currentTime / a.duration) * 100 : 0;
     progress.style.width = pct + '%';
-    timeLabel.textContent = formatDuration(audio.currentTime) + ' / ' + formatDuration(audio.duration || duration);
-  });
-  audio.addEventListener('ended', () => {
+    timeLabel.textContent = formatDuration(a.currentTime) + ' / ' + formatDuration(a.duration || duration);
+  } else {
     avatar.innerHTML = playIconSvg();
-    progress.style.width = '0%';
     timeLabel.textContent = formatDuration(0) + ' / ' + formatDuration(duration);
-  });
+  }
+
+  avatar.addEventListener('click', () => playSong(msg.id, objectUrl, duration, trackName));
   track.addEventListener('click', (e) => {
-    if (!audio.duration) return;
+    // Only scrub if this bubble's track is the one currently loaded.
+    if (songPlayer.currentId !== msg.id || !songPlayer.audio.duration) return;
     const rect = track.getBoundingClientRect();
     const pct = (e.clientX - rect.left) / rect.width;
-    audio.currentTime = pct * audio.duration;
+    songPlayer.audio.currentTime = Math.max(0, Math.min(1, pct)) * songPlayer.audio.duration;
   });
 
   return wrap;
