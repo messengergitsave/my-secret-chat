@@ -910,27 +910,33 @@ async function decryptBytes(key, ivB64, cipherBuf) {
 }
 
 /* ======================================================================
-   CATBOX.MOE — free anonymous file host used as "blind" storage.
+   LITTERBOX (Catbox's temporary-upload API) — free anonymous file host
+   used as "blind" storage, self-deleting after 72 hours.
    ----------------------------------------------------------------------
    We NEVER upload a real photo/video/voice note in the clear. The file
    is AES-GCM-encrypted on-device first (see encryptBytes above), and
-   only that unreadable ciphertext blob is sent to Catbox. Catbox just
-   sees random bytes and hands back a direct URL to them — it has no
-   way to know it's hosting a photo, a video, or anything else. The
-   URL itself is then also encrypted before it's written to Firestore,
-   so the database never reveals which Catbox links belong to a room.
+   only that unreadable ciphertext blob is sent to Litterbox. Litterbox
+   just sees random bytes and hands back a direct URL to them, valid for
+   72 hours before it auto-deletes on their servers — it has no way to
+   know it's hosting a photo, a video, or anything else. The URL itself
+   is then also encrypted before it's written to Firestore, so the
+   database never reveals which links belong to a room.
    ====================================================================== */
-// Catbox's API endpoint sends no Access-Control-Allow-Origin header, so a
+// Litterbox's API endpoint sends no Access-Control-Allow-Origin header, so a
 // direct fetch() from a browser page hosted elsewhere is blocked by CORS
 // before the request even leaves the client (shows up as a generic
 // "Failed to fetch" TypeError). Try the direct request first (works when
 // the page is opened from file:// or in setups where the browser allows
 // it), then fall back through a couple of free CORS proxies so the
-// upload actually reaches Catbox from a normal browser tab.
-const CATBOX_ENDPOINT = 'https://catbox.moe/user/api.php';
+// upload actually reaches Litterbox from a normal browser tab.
+const CATBOX_ENDPOINT = 'https://litterbox.catbox.moe/resources/internals/api.php';
+
+// How long an uploaded (encrypted) attachment stays on Litterbox before it
+// self-deletes. Litterbox only accepts '1h', '12h', '24h', '72h'.
+const CATBOX_EXPIRY = '72h';
 
 // Your own Cloudflare Worker acting as a CORS-safe reverse proxy in front of
-// Catbox. This is the reliable path — public proxies below are flaky (rate
+// Litterbox. This is the reliable path — public proxies below are flaky (rate
 // limits, 403s, broken POST handling) and only kept as a last-resort chain.
 // 1) Deploy worker.js (see accompanying file) to Cloudflare Workers (free).
 // 2) Paste the resulting *.workers.dev URL below.
@@ -956,9 +962,14 @@ async function uploadEncryptedBlobToCatbox(blob) {
     try {
       const formData = new FormData();
       formData.append('reqtype', 'fileupload');
+      // Forces 72h auto-deletion on Litterbox's side. When going through
+      // CATBOX_WORKER_PROXY, the worker re-forces this field server-side
+      // too, so a tampered client can't override it — this client-side
+      // value only matters for the direct/fallback routes below.
+      formData.append('time', CATBOX_EXPIRY);
       // Generic extension — the real mime type is stored separately (see
       // message doc's `mime` field) and used to rebuild the file after
-      // decryption; Catbox itself never needs to know what it is.
+      // decryption; Litterbox itself never needs to know what it is.
       formData.append('fileToUpload', blob, 'blob.enc');
       const resp = await fetch(endpoint, { method: 'POST', body: formData });
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
@@ -966,11 +977,11 @@ async function uploadEncryptedBlobToCatbox(blob) {
       if (!url.startsWith('http')) throw new Error('unexpected response: ' + url.slice(0, 200));
       return url;
     } catch (e) {
-      console.warn('Catbox upload attempt failed via', endpoint, '→', e.message || e);
+      console.warn('Litterbox upload attempt failed via', endpoint, '→', e.message || e);
       lastErr = e;
     }
   }
-  throw new Error('Catbox upload failed (all routes exhausted): ' + (lastErr?.message || lastErr));
+  throw new Error('Litterbox upload failed (all routes exhausted): ' + (lastErr?.message || lastErr));
 }
 
 // Downscales/recompresses an image client-side via <canvas> before it's
