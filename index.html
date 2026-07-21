@@ -1783,18 +1783,80 @@ function escapeHtml(s) {
 // and re-decrypt the same file every time the message list re-renders.
 const mediaCache = new Map();
 
+function replyIconSvg() { return `<svg viewBox="0 0 24 24"><path d="M10 9V5l-7 7 7 7v-4.1c5 0 8.5 1.6 11 5.1-1-5-4-10-11-11z"/></svg>`; }
+function editIconSvg() { return `<svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>`; }
+function deleteIconSvg() { return `<svg viewBox="0 0 24 24"><path d="M6 7h12l-1 13H7L6 7zm3-4h6l1 2h4v2H2V5h4l1-2z"/></svg>`; }
+
+function buildBubbleActions(chat, m) {
+  const wrap = document.createElement('div');
+  wrap.className = 'bubble-actions';
+
+  const replyBtn = document.createElement('button');
+  replyBtn.className = 'bubble-action-btn';
+  replyBtn.title = 'Ответить';
+  replyBtn.innerHTML = replyIconSvg();
+  replyBtn.addEventListener('click', () => startReply(chat, m));
+  wrap.appendChild(replyBtn);
+
+  if (m.out) {
+    if (m.kind === 'text') {
+      const editBtn = document.createElement('button');
+      editBtn.className = 'bubble-action-btn';
+      editBtn.title = 'Редактировать';
+      editBtn.innerHTML = editIconSvg();
+      editBtn.addEventListener('click', () => startEdit(chat, m));
+      wrap.appendChild(editBtn);
+    }
+    const delBtn = document.createElement('button');
+    delBtn.className = 'bubble-action-btn';
+    delBtn.title = 'Удалить';
+    delBtn.innerHTML = deleteIconSvg();
+    delBtn.addEventListener('click', () => {
+      if (confirm('Удалить сообщение у обоих?')) deleteMessageFromFirebase(chat, m.id);
+    });
+    wrap.appendChild(delBtn);
+  }
+
+  return wrap;
+}
+
+function buildReplyQuoteBlock(chat, m) {
+  const original = chat.messages.find(x => x.id === m.replyTo.id);
+  const quote = document.createElement('div');
+  quote.className = 'reply-quote';
+  const nameLine = document.createElement('span');
+  nameLine.className = 'reply-quote-name';
+  nameLine.textContent = original ? (original.out ? 'Вы' : (chat.name || 'Собеседник')) : 'Сообщение';
+  quote.appendChild(nameLine);
+  quote.appendChild(document.createTextNode(m.replyTo.preview));
+  quote.addEventListener('click', () => scrollToMessage(m.replyTo.id));
+  return quote;
+}
+
+function scrollToMessage(id) {
+  const el = document.getElementById('msg-' + id);
+  if (!el) return;
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  el.classList.remove('msg-highlight');
+  void el.offsetWidth; // restart animation if clicked repeatedly
+  el.classList.add('msg-highlight');
+}
+
 function renderMessages(chat) {
   messagesEl.innerHTML = '';
   chat.messages.forEach(m => {
     const row = document.createElement('div');
     row.className = 'msg-row ' + (m.out ? 'out' : 'in');
+    row.id = 'msg-' + m.id;
     const bubble = document.createElement('div');
     bubble.className = 'bubble';
+
+    if (m.replyTo) bubble.appendChild(buildReplyQuoteBlock(chat, m));
 
     if (m.kind === 'image' || m.kind === 'video' || m.kind === 'voice' || m.kind === 'audio') {
       bubble.classList.add('media-bubble');
       if (m.broken || !m.url) {
-        bubble.innerHTML = `<span class="bubble-text">🔒 Не удалось расшифровать (неверный ключ?)</span>`;
+        bubble.innerHTML += `<span class="bubble-text">🔒 Не удалось расшифровать (неверный ключ?)</span>`;
       } else {
         const holder = document.createElement('div');
         holder.className = 'media-holder';
@@ -1804,13 +1866,20 @@ function renderMessages(chat) {
       }
       const meta = document.createElement('span');
       meta.className = 'bubble-meta';
-      meta.innerHTML = m.time + (m.out ? readTickSvg() : '');
+      meta.innerHTML = m.time + (m.out ? readTickSvg(m.read) : '');
       bubble.appendChild(meta);
     } else {
-      bubble.innerHTML = `<span class="bubble-text">${escapeHtml(m.text)}</span>
-        <span class="bubble-meta">${m.time}${m.out ? readTickSvg() : ''}</span>`;
+      const textEl = document.createElement('span');
+      textEl.className = 'bubble-text';
+      textEl.textContent = m.text;
+      bubble.appendChild(textEl);
+      const meta = document.createElement('span');
+      meta.className = 'bubble-meta';
+      meta.innerHTML = (m.edited ? '<span class="bubble-edited">изменено</span>' : '') + m.time + (m.out ? readTickSvg(m.read) : '');
+      bubble.appendChild(meta);
     }
 
+    bubble.appendChild(buildBubbleActions(chat, m));
     row.appendChild(bubble);
     messagesEl.appendChild(row);
   });
@@ -2018,6 +2087,9 @@ function openChat(id) {
   // mark read
   chat.unread = 0;
 
+  clearComposeState();
+  closeChatSearch();
+
   chatHeaderName.textContent = chat.name;
   chatHeaderAvatar.style.background = chat.gradient;
   chatHeaderAvatar.textContent = chat.initials;
@@ -2066,12 +2138,63 @@ document.getElementById('search-input').addEventListener('input', (e) => {
    ====================================================================== */
 const messageInput = document.getElementById('message-input');
 const sendBtn = document.getElementById('send-btn');
+const composePreviewBar = document.getElementById('compose-preview-bar');
+const composePreviewIcon = document.getElementById('compose-preview-icon');
+const composePreviewLabel = document.getElementById('compose-preview-label');
+const composePreviewText = document.getElementById('compose-preview-text');
+const composePreviewClose = document.getElementById('compose-preview-close');
+
+let pendingReply = null;   // { id, preview }
+let pendingEditId = null;  // message id currently being edited
+
+function clearComposeState() {
+  pendingReply = null;
+  pendingEditId = null;
+  composePreviewBar.classList.remove('show');
+}
+
+function startReply(chat, m) {
+  if (chat.locked) return;
+  pendingEditId = null;
+  const preview = m.kind === 'text' ? m.text
+    : m.kind === 'image' ? '📷 Фото' : m.kind === 'video' ? '🎥 Видео'
+    : m.kind === 'audio' ? '🎵 Аудио' : '🎤 Голосовое сообщение';
+  pendingReply = { id: m.id, preview };
+  composePreviewIcon.innerHTML = replyIconSvg();
+  composePreviewLabel.textContent = 'Ответ ' + (m.out ? 'себе' : (chat.name || 'собеседнику'));
+  composePreviewText.textContent = preview;
+  composePreviewBar.classList.add('show');
+  messageInput.focus();
+}
+
+function startEdit(chat, m) {
+  if (chat.locked || m.kind !== 'text') return;
+  pendingReply = null;
+  pendingEditId = m.id;
+  composePreviewIcon.innerHTML = editIconSvg();
+  composePreviewLabel.textContent = 'Редактирование сообщения';
+  composePreviewText.textContent = m.text;
+  composePreviewBar.classList.add('show');
+  messageInput.value = m.text;
+  autoGrow();
+  messageInput.focus();
+}
+
+composePreviewClose.addEventListener('click', () => {
+  const wasEditing = !!pendingEditId;
+  clearComposeState();
+  if (wasEditing) { messageInput.value = ''; autoGrow(); }
+});
 
 function autoGrow() {
   messageInput.style.height = 'auto';
   messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + 'px';
 }
-messageInput.addEventListener('input', autoGrow);
+messageInput.addEventListener('input', () => {
+  autoGrow();
+  const chat = chats.find(c => c.id === activeChatId);
+  if (chat && !chat.locked) notifyTyping(chat);
+});
 
 function handleSend() {
   const text = messageInput.value.trim();
@@ -2079,7 +2202,15 @@ function handleSend() {
   const chat = chats.find(c => c.id === activeChatId);
   if (!chat || chat.locked) return;
 
-  sendToFirebase(chat, text);
+  if (pendingEditId) {
+    editMessageInFirebase(chat, pendingEditId, text);
+  } else {
+    sendToFirebase(chat, text, pendingReply);
+  }
+  clearComposeState();
+  setTypingStatus(chat, false);
+  clearTimeout(typingDebounceTimer);
+  typingCurrentlyOn = false;
 
   messageInput.value = '';
   autoGrow();
@@ -2092,6 +2223,80 @@ messageInput.addEventListener('keydown', (e) => {
     handleSend();
   }
 });
+
+/* ======================================================================
+   IN-CHAT SEARCH
+   ----------------------------------------------------------------------
+   Everything is already decrypted in memory (chat.messages), so this is
+   just a client-side filter over that array — nothing round-trips to
+   Firestore.
+   ====================================================================== */
+const chatSearchBtn = document.getElementById('chat-search-btn');
+const chatSearchBar = document.getElementById('chat-search-bar');
+const chatSearchInput = document.getElementById('chat-search-input');
+const chatSearchCount = document.getElementById('chat-search-count');
+const chatSearchPrev = document.getElementById('chat-search-prev');
+const chatSearchNext = document.getElementById('chat-search-next');
+const chatSearchClose = document.getElementById('chat-search-close');
+
+let searchMatches = [];
+let searchIndex = -1;
+
+function closeChatSearch() {
+  chatSearchBar.classList.remove('show');
+  chatSearchInput.value = '';
+  chatSearchCount.textContent = '';
+  searchMatches = [];
+  searchIndex = -1;
+}
+
+function runChatSearch() {
+  const term = chatSearchInput.value.trim().toLowerCase();
+  const chat = chats.find(c => c.id === activeChatId);
+  if (!term || !chat) {
+    searchMatches = [];
+    searchIndex = -1;
+    chatSearchCount.textContent = '';
+    return;
+  }
+  searchMatches = chat.messages
+    .filter(m => m.kind === 'text' && m.text.toLowerCase().includes(term))
+    .map(m => m.id);
+  searchIndex = searchMatches.length ? 0 : -1;
+  updateSearchCount();
+  if (searchIndex >= 0) scrollToMessage(searchMatches[searchIndex]);
+}
+
+function updateSearchCount() {
+  chatSearchCount.textContent = searchMatches.length
+    ? (searchIndex + 1) + ' / ' + searchMatches.length
+    : (chatSearchInput.value.trim() ? '0 / 0' : '');
+}
+
+function stepSearch(delta) {
+  if (!searchMatches.length) return;
+  searchIndex = (searchIndex + delta + searchMatches.length) % searchMatches.length;
+  updateSearchCount();
+  scrollToMessage(searchMatches[searchIndex]);
+}
+
+chatSearchBtn.addEventListener('click', () => {
+  if (!activeChatId) return;
+  const willShow = !chatSearchBar.classList.contains('show');
+  closeChatSearch();
+  if (willShow) {
+    chatSearchBar.classList.add('show');
+    chatSearchInput.focus();
+  }
+});
+chatSearchClose.addEventListener('click', closeChatSearch);
+chatSearchInput.addEventListener('input', runChatSearch);
+chatSearchInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); stepSearch(e.shiftKey ? -1 : 1); }
+  if (e.key === 'Escape') closeChatSearch();
+});
+chatSearchPrev.addEventListener('click', () => stepSearch(-1));
+chatSearchNext.addEventListener('click', () => stepSearch(1));
 
 /* ======================================================================
    ATTACHMENTS — photo / video via Catbox (encrypted)
