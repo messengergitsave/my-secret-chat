@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Selegram Web</title>
+<title>Telegram Web Clone</title>
 <style>
   :root{
     --bg-sidebar: #17212b;
@@ -571,6 +571,40 @@
     background:var(--accent,#4d76a3); color:#fff; font-weight:600; cursor:pointer; }
 
   #account-label{ font-size:13px; color:var(--text-secondary,#8a9ba8); white-space:nowrap; padding:0 4px; }
+
+  /* ================= CALLING ================= */
+  #call-btn svg{ fill: var(--online-dot, #4dd674); }
+  #call-bar{
+    display:flex; align-items:center; gap:10px; padding:8px 16px;
+    background: rgba(77,214,116,.12); border-bottom:1px solid rgba(77,214,116,.3);
+    font-size:13px;
+  }
+  #call-bar-text{ flex:1; }
+  #call-hangup-btn{
+    border:none; border-radius:6px; padding:6px 12px; background:#e05c5c; color:#fff;
+    font-weight:600; cursor:pointer; font-size:12px;
+  }
+  #incoming-call-overlay{
+    position:fixed; inset:0; z-index:60; background:rgba(0,0,0,.6);
+    display:flex; align-items:center; justify-content:center; padding:16px;
+  }
+  #incoming-call-box{
+    width:100%; max-width:300px; background:var(--bg-secondary,#17212b); border-radius:14px;
+    padding:28px 20px; text-align:center; box-shadow:0 10px 40px rgba(0,0,0,.5);
+  }
+  #incoming-call-avatar{
+    width:64px; height:64px; border-radius:50%; margin:0 auto 12px; display:flex;
+    align-items:center; justify-content:center; font-size:26px;
+    background:linear-gradient(135deg,#7c6ce0,#4d76a3);
+  }
+  #incoming-call-name{ font-weight:600; font-size:17px; }
+  #incoming-call-sub{ font-size:13px; color:var(--text-secondary,#8a9ba8); margin:4px 0 20px; }
+  #incoming-call-actions{ display:flex; justify-content:center; gap:28px; }
+  #incoming-call-actions button{
+    width:52px; height:52px; border-radius:50%; border:none; font-size:20px; cursor:pointer; color:#fff;
+  }
+  #incoming-call-decline{ background:#e05c5c; }
+  #incoming-call-accept{ background:#4dd674; }
 </style>
 </head>
 <body>
@@ -642,9 +676,20 @@
         <div class="avatar" id="finduser-avatar">?</div>
         <div id="finduser-nickname"></div>
         <div id="finduser-handle-label"></div>
-        <input type="password" id="finduser-password" placeholder="Пароль чата этого пользователя">
-        <button id="finduser-enter-btn">Открыть чат</button>
-        <div class="auth-error" id="finduser-enter-error"></div>
+        <button id="finduser-open-btn">Открыть чат</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= INCOMING CALL OVERLAY ================= -->
+  <div id="incoming-call-overlay" style="display:none;">
+    <div id="incoming-call-box">
+      <div class="avatar" id="incoming-call-avatar">?</div>
+      <div id="incoming-call-name"></div>
+      <div id="incoming-call-sub">Входящий звонок…</div>
+      <div id="incoming-call-actions">
+        <button id="incoming-call-decline" title="Отклонить">✕</button>
+        <button id="incoming-call-accept" title="Принять">📞</button>
       </div>
     </div>
   </div>
@@ -685,10 +730,19 @@
         <div id="chat-header-status"></div>
       </div>
       <div id="chat-header-actions">
+        <button class="icon-btn" id="call-btn" title="Позвонить" style="display:none;">
+          <svg viewBox="0 0 24 24"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.5.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1-9.4 0-17-7.6-17-17 0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.2.2 2.4.6 3.5.1.4 0 .8-.2 1L6.6 10.8z"/></svg>
+        </button>
         <button class="icon-btn"><svg viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3zm5.3 8a1 1 0 0 0-1 1 4.3 4.3 0 0 1-8.6 0 1 1 0 1 0-2 0 6.3 6.3 0 0 0 5.3 6.22V19H9a1 1 0 1 0 0 2h6a1 1 0 1 0 0-2h-2v-1.78A6.3 6.3 0 0 0 18.3 11a1 1 0 0 0-1-1z"/></svg></button>
         <button class="icon-btn"><svg viewBox="0 0 24 24"><path d="M12 8a2 2 0 1 0-2-2 2 2 0 0 0 2 2zm0 2a2 2 0 1 0 2 2 2 2 0 0 0-2-2zm0 6a2 2 0 1 0 2 2 2 2 0 0 0-2-2z"/></svg></button>
       </div>
     </div>
+
+    <div id="call-bar" style="display:none;">
+      <span id="call-bar-text"></span>
+      <button id="call-hangup-btn" title="Завершить звонок">Завершить</button>
+    </div>
+    <audio id="remote-audio" autoplay></audio>
 
     <div id="messages"></div>
 
@@ -746,7 +800,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import {
   getFirestore, collection, addDoc, query, orderBy,
   onSnapshot, serverTimestamp, limit,
-  doc, getDoc, setDoc, deleteDoc
+  doc, getDoc, getDocs, setDoc, deleteDoc
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // PASTE YOUR OWN CONFIG HERE ⬇⬇⬇
@@ -957,40 +1011,54 @@ function setConnStatus(ok, text) {
   el.className = ok ? 'ok' : 'bad';
 }
 
-async function connectToRoom(roomId, passphrase) {
-  if (!db) {
-    const ok = initFirebase();
-    if (!ok) { setConnStatus(false, 'Firebase config missing/invalid'); return; }
-  }
-  if (!passphrase) {
-    setConnStatus(false, 'Введите секретную фразу для шифрования');
-    return;
-  }
-  if (unsubscribe) unsubscribe();
+// Derives a short-lived visual identity (initials + gradient color) from a
+// nickname, so contacts look distinct in the chat list without needing
+// real avatar images.
+const AVATAR_GRADIENTS = [
+  'linear-gradient(135deg,#8e6cd6,#4d76a3)',
+  'linear-gradient(135deg,#e0724f,#c74b4b)',
+  'linear-gradient(135deg,#3fa08f,#2f8f6f)',
+  'linear-gradient(135deg,#4d9de0,#3a6ea5)',
+  'linear-gradient(135deg,#d68fd6,#a35bab)',
+  'linear-gradient(135deg,#e0b34d,#c78a3a)',
+];
+function avatarFor(name) {
+  const clean = (name || '?').trim();
+  let hash = 0;
+  for (let i = 0; i < clean.length; i++) hash = (hash * 31 + clean.charCodeAt(i)) >>> 0;
+  return {
+    initials: (clean[0] || '?').toUpperCase(),
+    gradient: AVATAR_GRADIENTS[hash % AVATAR_GRADIENTS.length],
+  };
+}
 
-  setConnStatus(true, 'Deriving key…');
-  currentKey = await deriveRoomKey(passphrase, roomId);
-  currentRoomId = roomId;
+function formatTime(d) {
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
 
-  const msgsRef = collection(db, 'rooms', roomId, 'messages');
+/* ======================================================================
+   PER-CHAT MESSAGE SYNC
+   ----------------------------------------------------------------------
+   Every chat (the manual Room/Ключ bar, your own account chat, and each
+   contact you've opened) is backed by its own Firestore room + its own
+   derived key, tracked on the chat object itself — not in one shared
+   global — so multiple chats can be unlocked and updated in the
+   background at the same time without stepping on each other.
+   ====================================================================== */
+function subscribeChatMessages(chat) {
+  if (chat.unsubscribeMsgs) chat.unsubscribeMsgs();
+
+  const msgsRef = collection(db, 'rooms', chat.roomId, 'messages');
   const q = query(msgsRef, orderBy('createdAt', 'asc'), limit(500));
 
-  setConnStatus(true, 'Connecting…');
-  unsubscribe = onSnapshot(q, async (snap) => {
-    const liveChat = chats.find(c => c.id === 'live');
-
-    // Ciphertext comes back from Firestore — decrypt every message locally
-    // with the key derived from the passphrase. For text messages we
-    // decrypt the text itself; for media messages we only decrypt the
-    // Catbox link here (cheap) — the actual file bytes are fetched +
-    // decrypted lazily when the bubble is rendered (see loadMediaInto).
+  chat.unsubscribeMsgs = onSnapshot(q, async (snap) => {
     const decoded = await Promise.all(snap.docs.map(async (d) => {
       const raw = d.data();
       const out = raw.sender === DEVICE_ID;
       const time = formatTime(raw.createdAt ? raw.createdAt.toDate() : new Date());
 
-      if (raw.kind === 'image' || raw.kind === 'video' || raw.kind === 'voice') {
-        const url = await decryptMessage(currentKey, raw.linkIv, raw.linkData);
+      if (raw.kind === 'image' || raw.kind === 'video' || raw.kind === 'voice' || raw.kind === 'audio') {
+        const url = await decryptMessage(chat.key, raw.linkIv, raw.linkData);
         return {
           id: d.id, out, time, kind: raw.kind,
           url, fileIv: raw.fileIv, mime: raw.mime, duration: raw.duration || 0,
@@ -998,33 +1066,39 @@ async function connectToRoom(roomId, passphrase) {
         };
       }
 
-      const plaintext = await decryptMessage(currentKey, raw.iv, raw.data);
+      const plaintext = await decryptMessage(chat.key, raw.iv, raw.data);
       return {
         id: d.id, out, time, kind: 'text',
         text: plaintext !== null ? plaintext : '🔒 Не удалось расшифровать (неверный ключ?)'
       };
     }));
 
-    liveChat.messages = decoded;
-    setConnStatus(true, '🔒 Encrypted · room: ' + roomId);
+    chat.messages = decoded;
 
-    if (activeChatId === 'live') renderMessages(liveChat);
-    if (liveChat.messages.length) {
-      const last = liveChat.messages[liveChat.messages.length - 1];
-      liveChat.preview = last.kind === 'text' ? last.text
+    if (activeChatId === chat.id) {
+      renderMessages(chat);
+      chatHeaderStatus.textContent = '🔒 Зашифровано';
+      chatHeaderStatus.className = 'online';
+      if (chat.id === 'manual') setConnStatus(true, '🔒 Encrypted · room: ' + chat.roomId);
+    }
+    if (chat.messages.length) {
+      const last = chat.messages[chat.messages.length - 1];
+      chat.preview = last.kind === 'text' ? last.text
         : last.kind === 'image' ? '📷 Фото'
         : last.kind === 'video' ? '🎥 Видео'
+        : last.kind === 'audio' ? '🎵 Аудио'
         : '🎤 Голосовое сообщение';
-      renderChatList();
+      chat.time = last.time;
+      renderChatList(document.getElementById('search-input').value);
     }
   }, (err) => {
     console.error(err);
-    setConnStatus(false, 'Connection error — check config/rules');
+    if (activeChatId === chat.id && chat.id === 'manual') setConnStatus(false, 'Connection error — check config/rules');
   });
 }
 
-async function sendToFirebase(roomId, text) {
-  if (!db || !currentKey || currentRoomId !== roomId) {
+async function sendToFirebase(chat, text) {
+  if (!db || !chat || !chat.key) {
     setConnStatus(false, 'Сначала подключитесь к комнате (Room ID + фраза)');
     return;
   }
@@ -1032,8 +1106,8 @@ async function sendToFirebase(roomId, text) {
     // Encrypt on-device BEFORE it ever touches the network/Firestore.
     // Only unreadable { iv, data } ciphertext is written — the plaintext
     // field does not exist in the database at all.
-    const { iv, data } = await encryptMessage(currentKey, text);
-    await addDoc(collection(db, 'rooms', roomId, 'messages'), {
+    const { iv, data } = await encryptMessage(chat.key, text);
+    await addDoc(collection(db, 'rooms', chat.roomId, 'messages'), {
       kind: 'text',
       iv,
       data,
@@ -1050,45 +1124,106 @@ async function sendToFirebase(roomId, text) {
 // bytes, upload the ciphertext blob to Catbox (blind storage — Catbox
 // never sees the real content), then encrypt the returned link and
 // write a message doc pointing at it.
-async function sendMediaToFirebase(roomId, kind, fileBlob, mime, duration = 0) {
-  if (!db || !currentKey || currentRoomId !== roomId) {
+async function sendMediaToFirebase(chat, kind, fileBlob, mime, duration = 0) {
+  if (!db || !chat || !chat.key) {
     setConnStatus(false, 'Сначала подключитесь к комнате (Room ID + фраза)');
     return;
   }
   try {
     setConnStatus(true, kind === 'voice' ? 'Отправка голосового…' : 'Загрузка файла…');
     const buffer = await fileBlob.arrayBuffer();
-    const { iv: fileIv, cipherBuf } = await encryptBytes(currentKey, buffer);
+    const { iv: fileIv, cipherBuf } = await encryptBytes(chat.key, buffer);
     const url = await uploadEncryptedBlobToCatbox(new Blob([cipherBuf]));
-    const { iv: linkIv, data: linkData } = await encryptMessage(currentKey, url);
+    const { iv: linkIv, data: linkData } = await encryptMessage(chat.key, url);
 
-    await addDoc(collection(db, 'rooms', roomId, 'messages'), {
+    await addDoc(collection(db, 'rooms', chat.roomId, 'messages'), {
       kind, linkIv, linkData, fileIv, mime, duration,
       sender: DEVICE_ID,
       createdAt: serverTimestamp()
     });
-    setConnStatus(true, '🔒 Encrypted · room: ' + roomId);
+    setConnStatus(true, '🔒 Encrypted · room: ' + chat.roomId);
   } catch (e) {
     console.error("Media send failed:", e.message || e);
     setConnStatus(false, 'Не удалось отправить файл (проверь интернет/Catbox)');
   }
 }
 
-/* ======================================================================
-   DEMO DATA — sample chats matching the Telegram screenshots
-   ====================================================================== */
-function formatTime(d) {
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+async function connectManualRoom(roomId, passphrase) {
+  if (!db) {
+    const ok = initFirebase();
+    if (!ok) { setConnStatus(false, 'Firebase config missing/invalid'); return; }
+  }
+  if (!passphrase) {
+    setConnStatus(false, 'Введите секретную фразу для шифрования');
+    return;
+  }
+  const chat = chats.find(c => c.id === 'manual');
+  setConnStatus(true, 'Deriving key…');
+  chat.roomId = roomId;
+  chat.key = await deriveRoomKey(passphrase, roomId);
+  chat.locked = false;
+  setConnStatus(true, 'Connecting…');
+  subscribeChatMessages(chat);
 }
 
+/* ======================================================================
+   CHAT LIST DATA
+   ----------------------------------------------------------------------
+   'manual' is the original Room ID + passphrase bar at the bottom (kept
+   for power users / testing). Everything else — your own account chat
+   plus every contact you've opened via @handle search — gets pushed in
+   dynamically once you're logged in (see ACCOUNT SYSTEM below).
+   ====================================================================== */
 const chats = [
   {
-    id: 'live', name: 'Live Room Chat', gradient: 'linear-gradient(135deg,#8e6cd6,#4d76a3)',
-    initials: '🔥', status: 'Firebase realtime', online: true,
-    preview: 'Connect below to start chatting', time: 'now', unread: 0, muted: false,
+    id: 'manual', roomId: 'demo-room', name: 'Room ID chat (ручной режим)',
+    gradient: 'linear-gradient(135deg,#8e6cd6,#4d76a3)', initials: '🔥',
+    isAccount: false, locked: false, key: null,
+    unsubscribeMsgs: null, unsubscribeCall: null,
+    status: 'Firebase realtime', online: true,
+    preview: 'Введите Room ID и фразу внизу', time: '', unread: 0, muted: false,
     messages: []
   }
 ];
+
+function addChatIfMissing(chat) {
+  if (!chats.find(c => c.id === chat.id)) chats.push(chat);
+  return chats.find(c => c.id === chat.id);
+}
+
+// Builds a (locked, not-yet-subscribed) chat entry for an account —
+// either your own or a contact's. Call unlockAccountChat() to actually
+// derive the key and start receiving messages.
+function makeAccountChat(handle, nickname) {
+  const { initials, gradient } = avatarFor(nickname);
+  return {
+    id: 'user:' + handle, roomId: 'user:' + handle, handle, name: nickname,
+    gradient, initials,
+    isAccount: true, locked: true, key: null,
+    unsubscribeMsgs: null, unsubscribeCall: null,
+    status: '', online: false,
+    preview: '🔒 Нажмите, чтобы разблокировать', time: '', unread: 0, muted: false,
+    messages: []
+  };
+}
+
+// Verifies the CHAT password against the target account's room-verifier,
+// then derives the real room key and starts syncing messages + call
+// signaling for this chat. Throws with a user-facing message on failure.
+async function unlockAccountChat(chat, chatPassword) {
+  const userSnap = await getDoc(doc(db, 'users', chat.handle));
+  if (!userSnap.exists()) throw new Error('Аккаунт не найден');
+  const data = userSnap.data();
+  const key = await deriveRoomKey(chatPassword, chat.roomId);
+  const plaintext = await decryptMessage(key, data.roomVerifierIv, data.roomVerifierData);
+  if (plaintext !== ROOM_VERIFIER_PLAINTEXT) throw new Error('Неверный пароль чата');
+
+  chat.key = key;
+  chat.locked = false;
+  chat.name = chat.isSelf ? (data.nickname + ' (вы)') : data.nickname; // pick up their latest nickname
+  subscribeChatMessages(chat);
+  subscribeChatCalls(chat);
+}
 
 let activeChatId = null;
 
@@ -1102,6 +1237,7 @@ const inputPanelEl = document.getElementById('input-panel');
 const chatHeaderName = document.getElementById('chat-header-name');
 const chatHeaderStatus = document.getElementById('chat-header-status');
 const chatHeaderAvatar = document.getElementById('chat-header-avatar');
+const callBtn = document.getElementById('call-btn');
 const appEl = document.getElementById('app');
 
 function avatarHtml(chat, size) {
@@ -1109,10 +1245,10 @@ function avatarHtml(chat, size) {
 }
 
 function renderChatList(filter = '') {
-  const f = filter.trim().toLowerCase();
+  const f = filter.trim().toLowerCase().replace(/^@/, '');
   chatListEl.innerHTML = '';
   chats
-    .filter(c => c.name.toLowerCase().includes(f))
+    .filter(c => c.name.toLowerCase().includes(f) || (c.handle && c.handle.includes(f)))
     .forEach(chat => {
       const div = document.createElement('div');
       div.className = 'chat-item' + (chat.id === activeChatId ? ' active' : '');
@@ -1167,7 +1303,7 @@ function renderMessages(chat) {
         holder.className = 'media-holder';
         holder.innerHTML = `<span class="media-loading">⏳ Загрузка…</span>`;
         bubble.appendChild(holder);
-        loadMediaInto(m, holder);
+        loadMediaInto(m, holder, chat.key);
       }
       const meta = document.createElement('span');
       meta.className = 'bubble-meta';
@@ -1186,7 +1322,7 @@ function renderMessages(chat) {
 
 // Fetches the (still-encrypted) file from its Catbox URL, decrypts it
 // client-side with the room key, and renders the right element for it.
-async function loadMediaInto(msg, holderEl) {
+async function loadMediaInto(msg, holderEl, key) {
   if (mediaCache.has(msg.id)) {
     renderMediaElement(msg, holderEl, mediaCache.get(msg.id));
     return;
@@ -1195,7 +1331,7 @@ async function loadMediaInto(msg, holderEl) {
     const resp = await fetch(msg.url);
     if (!resp.ok) throw new Error('fetch failed: ' + resp.status);
     const cipherBuf = await resp.arrayBuffer();
-    const plainBuf = await decryptBytes(currentKey, msg.fileIv, cipherBuf);
+    const plainBuf = await decryptBytes(key, msg.fileIv, cipherBuf);
     if (!plainBuf) { holderEl.innerHTML = '🔒 Не удалось расшифровать файл'; return; }
     const objectUrl = URL.createObjectURL(new Blob([plainBuf], { type: msg.mime }));
     mediaCache.set(msg.id, objectUrl);
@@ -1291,32 +1427,41 @@ function readTickSvg() {
 }
 
 function openChat(id) {
-  activeChatId = id;
   const chat = chats.find(c => c.id === id);
   if (!chat) return;
+  activeChatId = id;
 
   // mark read
   chat.unread = 0;
 
   chatHeaderName.textContent = chat.name;
-  chatHeaderStatus.textContent = chat.status;
-  chatHeaderStatus.className = chat.online ? 'online' : '';
   chatHeaderAvatar.style.background = chat.gradient;
   chatHeaderAvatar.textContent = chat.initials;
 
   emptyStateEl.style.display = 'none';
-  inputPanelEl.style.display = 'flex';
-  messagesEl.style.display = 'flex';
-
-  renderMessages(chat);
   renderChatList(document.getElementById('search-input').value);
 
   // mobile: slide to chat view
   appEl.classList.add('chat-open');
 
-  if (id === 'live' && db) {
-    // already connected via room bar; nothing extra needed
+  if (chat.isAccount && chat.locked) {
+    // Don't reveal anything until the CHAT password for this specific
+    // conversation is entered — this is the per-chat unlock, not a
+    // blanket prompt shown on every page load.
+    messagesEl.style.display = 'none';
+    inputPanelEl.style.display = 'none';
+    chatHeaderStatus.textContent = '🔒 Заблокировано';
+    chatHeaderStatus.className = '';
+    requestUnlockForChat(chat);
+    return;
   }
+
+  chatHeaderStatus.textContent = chat.isAccount ? '🔒 Зашифровано' : chat.status;
+  chatHeaderStatus.className = 'online';
+  callBtn.style.display = (chat.isAccount && !chat.locked) ? 'flex' : 'none';
+  messagesEl.style.display = 'flex';
+  inputPanelEl.style.display = 'flex';
+  renderMessages(chat);
 }
 
 document.getElementById('back-btn').addEventListener('click', () => {
@@ -1326,6 +1471,7 @@ document.getElementById('back-btn').addEventListener('click', () => {
 document.getElementById('search-input').addEventListener('input', (e) => {
   renderChatList(e.target.value);
 });
+
 
 /* ======================================================================
    SENDING MESSAGES
@@ -1343,21 +1489,9 @@ function handleSend() {
   const text = messageInput.value.trim();
   if (!text || !activeChatId) return;
   const chat = chats.find(c => c.id === activeChatId);
+  if (!chat || chat.locked) return;
 
-  if (chat.id === 'live') {
-    // Real Firebase-backed room — use whichever room we're actually
-    // connected to (set by connectToRoom), not the manual bar's input,
-    // since account/find-user logins connect without touching that field.
-    const roomId = currentRoomId || document.getElementById('room-input').value.trim() || 'demo-room';
-    sendToFirebase(roomId, text);
-  } else {
-    // Local demo chat — just echo into the UI
-    chat.messages.push({ out: true, text, time: formatTime(new Date()) });
-    chat.preview = text;
-    chat.time = formatTime(new Date());
-    renderMessages(chat);
-    renderChatList(document.getElementById('search-input').value);
-  }
+  sendToFirebase(chat, text);
 
   messageInput.value = '';
   autoGrow();
@@ -1384,9 +1518,8 @@ fileInput.addEventListener('change', async () => {
   fileInput.value = ''; // allow picking the same file again later
   if (!file || !activeChatId) return;
   const chat = chats.find(c => c.id === activeChatId);
-  if (chat.id !== 'live') return; // media only supported on the live Firebase room
+  if (!chat || chat.locked) return; // media only supported on unlocked Firebase-backed chats
 
-  const roomId = currentRoomId || document.getElementById('room-input').value.trim() || 'demo-room';
   const isVideo = file.type.startsWith('video/');
   const kind = isVideo ? 'video' : 'image';
 
@@ -1401,7 +1534,7 @@ fileInput.addEventListener('change', async () => {
     }
   }
 
-  sendMediaToFirebase(roomId, kind, blobToSend, mime);
+  sendMediaToFirebase(chat, kind, blobToSend, mime);
 });
 
 /* ======================================================================
@@ -1421,8 +1554,8 @@ let recordTimerInterval = null;
 let recordCancelled = false;
 
 async function startRecording() {
-  if (!activeChatId || chats.find(c => c.id === activeChatId).id !== 'live') return;
-  if (!currentKey) { setConnStatus(false, 'Сначала подключитесь к комнате'); return; }
+  const chat = activeChatId ? chats.find(c => c.id === activeChatId) : null;
+  if (!chat || chat.locked) { setConnStatus(false, 'Сначала подключитесь к комнате'); return; }
 
   let stream;
   try {
@@ -1448,8 +1581,7 @@ async function startRecording() {
 
     const durationSec = (Date.now() - recordStartTime) / 1000;
     const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
-    const roomId = currentRoomId || document.getElementById('room-input').value.trim() || 'demo-room';
-    sendMediaToFirebase(roomId, 'voice', blob, blob.type, durationSec);
+    sendMediaToFirebase(chat, 'voice', blob, blob.type, durationSec);
   };
 
   mediaRecorder.start();
@@ -1477,8 +1609,8 @@ recCancelBtn.addEventListener('click', () => stopRecording(true));
 document.getElementById('room-join-btn').addEventListener('click', () => {
   const roomId = document.getElementById('room-input').value.trim() || 'demo-room';
   const passphrase = document.getElementById('passphrase-input').value;
-  connectToRoom(roomId, passphrase);
-  if (activeChatId !== 'live') openChat('live');
+  connectManualRoom(roomId, passphrase);
+  if (activeChatId !== 'manual') openChat('manual');
 });
 
 /* ======================================================================
@@ -1575,11 +1707,41 @@ function setAccountUI(account) {
   }
 }
 
-function showUnlockOverlay(show, handle) {
-  if (show) document.getElementById('unlock-handle').textContent = '@' + handle;
+// The chat currently waiting on a password in the unlock overlay — set by
+// requestUnlockForChat(), read by the unlock-form submit handler below.
+let pendingUnlockChat = null;
+
+function requestUnlockForChat(chat) {
+  pendingUnlockChat = chat;
+  document.getElementById('unlock-handle').textContent = chat.name + ' (@' + chat.handle + ')';
   document.getElementById('unlock-error').textContent = '';
   document.getElementById('unlock-password').value = '';
-  document.getElementById('unlock-overlay').style.display = show ? 'flex' : 'none';
+  document.getElementById('unlock-overlay').style.display = 'flex';
+}
+function hideUnlockOverlay() {
+  pendingUnlockChat = null;
+  document.getElementById('unlock-overlay').style.display = 'none';
+}
+
+// Loads the current account's own chat entry + saved contacts from
+// Firestore and adds them (locked) to the sidebar. Doesn't unlock
+// anything — that only happens when the user opens a specific chat.
+async function loadMyChats(handle, nickname) {
+  const myChat = makeAccountChat(handle, nickname);
+  myChat.isSelf = true;
+  myChat.name = nickname + ' (вы)';
+  addChatIfMissing(myChat);
+
+  try {
+    const contactsSnap = await getDocs(collection(db, 'users', handle, 'contacts'));
+    contactsSnap.forEach(d => {
+      const data = d.data();
+      addChatIfMissing(makeAccountChat(d.id, data.nickname || ('@' + d.id)));
+    });
+  } catch (e) {
+    console.error('Failed to load contacts:', e);
+  }
+  renderChatList(document.getElementById('search-input').value);
 }
 
 async function tryRestoreSession() {
@@ -1597,7 +1759,10 @@ async function tryRestoreSession() {
     const userSnap = await getDoc(doc(db, 'users', handle));
     if (!userSnap.exists()) { await destroySession(); setAccountUI(null); return; }
     setAccountUI({ handle, nickname: userSnap.data().nickname });
-    showUnlockOverlay(true, handle); // identity restored, but chat key requires the chat password
+    // Identity restored silently — no blanket "unlock" screen. Every
+    // chat (yours + contacts) shows up locked in the list and only asks
+    // for its password when you actually open it.
+    await loadMyChats(handle, userSnap.data().nickname);
   } catch (e) {
     console.error('Session restore failed:', e);
     setAccountUI(null);
@@ -1621,9 +1786,7 @@ async function registerAccount(handle, nickname, accountPassword, chatPassword) 
   const verifier = await encryptMessage(accountKey, VERIFIER_PLAINTEXT);
 
   // Room verifier — proves you know the CHAT password, completely separate
-  // secret from the login password. This is the same key deriveRoomKey/
-  // connectToRoom will use ('user:' + handle namespace) to encrypt messages,
-  // so someone who only has the account password still can't decrypt chats.
+  // secret from the login password.
   const roomKey = await deriveRoomKey(chatPassword, 'user:' + handle);
   const roomVerifier = await encryptMessage(roomKey, ROOM_VERIFIER_PLAINTEXT);
 
@@ -1636,11 +1799,15 @@ async function registerAccount(handle, nickname, accountPassword, chatPassword) 
 
   await createSession(handle);
   setAccountUI({ handle, nickname: nickname.trim() });
+
+  const myChat = makeAccountChat(handle, nickname.trim());
+  myChat.isSelf = true;
+  myChat.name = nickname.trim() + ' (вы)';
+  addChatIfMissing(myChat);
   // We already have the chat password right here, so unlock immediately
   // instead of making the user type it again on the next screen.
-  await connectToRoom('user:' + handle, chatPassword);
-  showUnlockOverlay(false);
-  openChat('live');
+  await unlockAccountChat(myChat, chatPassword);
+  openChat(myChat.id);
 }
 
 async function loginAccount(handle, accountPassword) {
@@ -1657,8 +1824,8 @@ async function loginAccount(handle, accountPassword) {
   await createSession(handle);
   setAccountUI({ handle, nickname: data.nickname });
   // Login only proves identity — the chat password is separate and wasn't
-  // provided here, so the room stays locked until it's entered explicitly.
-  showUnlockOverlay(true, handle);
+  // provided here, so every chat stays locked until opened individually.
+  await loadMyChats(handle, data.nickname);
 }
 
 document.getElementById('auth-tab-login').addEventListener('click', () => {
@@ -1715,34 +1882,39 @@ document.getElementById('unlock-form').addEventListener('submit', async (e) => {
   const errEl = document.getElementById('unlock-error');
   errEl.textContent = '';
   const chatPassword = document.getElementById('unlock-password').value;
-  if (!currentAccount) return;
+  const chat = pendingUnlockChat;
+  if (!chat) return;
   try {
-    const userSnap = await getDoc(doc(db, 'users', currentAccount.handle));
-    const data = userSnap.data();
-    const roomKey = await deriveRoomKey(chatPassword, 'user:' + currentAccount.handle);
-    const plaintext = await decryptMessage(roomKey, data.roomVerifierIv, data.roomVerifierData);
-    if (plaintext !== ROOM_VERIFIER_PLAINTEXT) { errEl.textContent = 'Неверный пароль чата'; return; }
-    await connectToRoom('user:' + currentAccount.handle, chatPassword);
-    showUnlockOverlay(false);
-    openChat('live');
+    await unlockAccountChat(chat, chatPassword);
+    hideUnlockOverlay();
+    openChat(chat.id);
   } catch (err) {
-    errEl.textContent = 'Ошибка: ' + err.message;
+    errEl.textContent = err.message;
   }
 });
 
 document.getElementById('logout-btn').addEventListener('click', async () => {
   await destroySession();
-  currentKey = null;
-  currentRoomId = null;
-  if (unsubscribe) unsubscribe();
-  setConnStatus(false, 'Вышли из аккаунта');
+  // Tear down every account-backed chat: unsubscribe listeners, drop them
+  // from the list entirely so the next login starts clean.
+  for (const chat of chats.filter(c => c.isAccount)) {
+    if (chat.unsubscribeMsgs) chat.unsubscribeMsgs();
+    if (chat.unsubscribeCall) chat.unsubscribeCall();
+  }
+  for (let i = chats.length - 1; i >= 0; i--) {
+    if (chats[i].isAccount) chats.splice(i, 1);
+  }
+  if (activeCall) endActiveCall(true);
+  if (activeChatId && activeChatId !== 'manual') openChat('manual');
   setAccountUI(null);
+  renderChatList();
 });
 
 /* ---- Find user by @handle ---- */
 const finduserBtn = document.getElementById('finduser-btn');
 const finduserOverlay = document.getElementById('finduser-overlay');
 let foundHandle = null;
+let foundNickname = null;
 
 finduserBtn.addEventListener('click', () => {
   document.getElementById('finduser-error').textContent = '';
@@ -1765,47 +1937,223 @@ document.getElementById('finduser-form').addEventListener('submit', async (e) =>
     const snap = await getDoc(doc(db, 'users', handle));
     if (!snap.exists()) { errEl.textContent = 'Пользователь не найден'; return; }
     foundHandle = handle;
-    const data = snap.data();
-    document.getElementById('finduser-nickname').textContent = data.nickname;
+    foundNickname = snap.data().nickname;
+    document.getElementById('finduser-nickname').textContent = foundNickname;
     document.getElementById('finduser-handle-label').textContent = '@' + handle;
-    document.getElementById('finduser-avatar').textContent = (data.nickname[0] || '?').toUpperCase();
-    document.getElementById('finduser-password').value = '';
-    document.getElementById('finduser-enter-error').textContent = '';
+    document.getElementById('finduser-avatar').textContent = (foundNickname[0] || '?').toUpperCase();
     document.getElementById('finduser-profile').style.display = 'flex';
   } catch (err) {
     errEl.textContent = 'Ошибка поиска: ' + err.message;
   }
 });
 
-document.getElementById('finduser-enter-btn').addEventListener('click', async () => {
-  const errEl = document.getElementById('finduser-enter-error');
-  errEl.textContent = '';
-  const password = document.getElementById('finduser-password').value;
-  if (!foundHandle || !password) { errEl.textContent = 'Введите пароль'; return; }
+// "Открыть чат" just adds the contact to your list (persisted to
+// Firestore so it's still there next session) and opens it — no password
+// here at all. Opening a locked account chat is what triggers the
+// per-chat unlock prompt (see openChat()).
+document.getElementById('finduser-open-btn').addEventListener('click', async () => {
+  if (!foundHandle || !currentAccount) return;
   try {
-    // Verify against that account's CHAT-password verifier (not their
-    // login/account verifier — the two are separate secrets), so a wrong
-    // password gives a clear error instead of silently landing in a room
-    // full of undecryptable messages.
-    const userSnap = await getDoc(doc(db, 'users', foundHandle));
-    const data = userSnap.data();
-    const key = await deriveRoomKey(password, 'user:' + foundHandle);
-    const plaintext = await decryptMessage(key, data.roomVerifierIv, data.roomVerifierData);
-    if (plaintext !== ROOM_VERIFIER_PLAINTEXT) { errEl.textContent = 'Неверный пароль чата'; return; }
-
-    await connectToRoom('user:' + foundHandle, password);
-    finduserOverlay.style.display = 'none';
-    openChat('live');
+    await setDoc(doc(db, 'users', currentAccount.handle, 'contacts', foundHandle), {
+      nickname: foundNickname,
+      addedAt: serverTimestamp(),
+    });
   } catch (err) {
-    errEl.textContent = 'Ошибка: ' + err.message;
+    console.error('Failed to save contact:', err);
   }
+  const chat = addChatIfMissing(makeAccountChat(foundHandle, foundNickname));
+  finduserOverlay.style.display = 'none';
+  renderChatList(document.getElementById('search-input').value);
+  openChat(chat.id);
 });
+
+/* ======================================================================
+   VOICE CALLS — 1:1 WebRTC calling, signaled through Firestore.
+   ----------------------------------------------------------------------
+   Signaling doc: calls/{roomId} holds { offer, answer, callerDevice,
+   status }. ICE candidates go in the offerCandidates/answerCandidates
+   subcollections underneath it. Audio only, STUN-only (no TURN server
+   configured) — calls between devices on restrictive/symmetric NATs
+   (common on some mobile networks) may fail to connect; there's no
+   fallback relay for that case in this setup.
+   ====================================================================== */
+const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }];
+let activeCall = null; // { chat, pc, localStream, role, unsubDoc, unsubCandidates }
+
+function subscribeChatCalls(chat) {
+  if (chat.unsubscribeCall) chat.unsubscribeCall();
+  const callDocRef = doc(db, 'calls', chat.roomId);
+  chat.unsubscribeCall = onSnapshot(callDocRef, (snap) => {
+    if (!snap.exists()) return;
+    const data = snap.data();
+    if (data.status === 'ringing' && data.callerDevice !== DEVICE_ID && !activeCall) {
+      showIncomingCall(chat, data);
+    }
+    if (data.status === 'ended' && activeCall && activeCall.chat.id === chat.id) {
+      endActiveCall(false);
+    }
+  }, (err) => console.error('Call signaling error:', err));
+}
+
+function playRemoteStream(stream) {
+  const audioEl = document.getElementById('remote-audio');
+  audioEl.srcObject = stream;
+}
+
+function showCallBar(text) {
+  document.getElementById('call-bar-text').textContent = text;
+  document.getElementById('call-bar').style.display = 'flex';
+}
+function hideCallBar() {
+  document.getElementById('call-bar').style.display = 'none';
+}
+function showIncomingCall(chat, data) {
+  document.getElementById('incoming-call-avatar').style.background = chat.gradient;
+  document.getElementById('incoming-call-avatar').textContent = chat.initials;
+  document.getElementById('incoming-call-name').textContent = chat.name;
+  document.getElementById('incoming-call-overlay').dataset.chatId = chat.id;
+  document.getElementById('incoming-call-overlay').style.display = 'flex';
+  pendingIncomingCall = { chat, data };
+}
+function hideIncomingCallOverlay() {
+  pendingIncomingCall = null;
+  document.getElementById('incoming-call-overlay').style.display = 'none';
+}
+let pendingIncomingCall = null;
+
+async function startCall(chat) {
+  if (activeCall) { alert('У вас уже есть активный звонок'); return; }
+  let localStream;
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (e) {
+    alert('Не удалось получить доступ к микрофону: ' + e.message);
+    return;
+  }
+
+  const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+  localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+  const remoteStream = new MediaStream();
+  pc.ontrack = (e) => { e.streams[0].getTracks().forEach(t => remoteStream.addTrack(t)); playRemoteStream(remoteStream); };
+
+  activeCall = { chat, pc, localStream, role: 'caller' };
+
+  const callDocRef = doc(db, 'calls', chat.roomId);
+  const offerCandidatesRef = collection(db, 'calls', chat.roomId, 'offerCandidates');
+  const answerCandidatesRef = collection(db, 'calls', chat.roomId, 'answerCandidates');
+
+  pc.onicecandidate = (e) => { if (e.candidate) addDoc(offerCandidatesRef, e.candidate.toJSON()); };
+
+  const offerDesc = await pc.createOffer();
+  await pc.setLocalDescription(offerDesc);
+  await setDoc(callDocRef, {
+    offer: { sdp: offerDesc.sdp, type: offerDesc.type },
+    answer: null,
+    callerDevice: DEVICE_ID,
+    status: 'ringing',
+    createdAt: serverTimestamp(),
+  });
+
+  showCallBar('Звоним: ' + chat.name + '…');
+
+  activeCall.unsubDoc = onSnapshot(callDocRef, async (snap) => {
+    const data = snap.data();
+    if (!data) return;
+    if (data.answer && !pc.currentRemoteDescription) {
+      await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+      showCallBar('В звонке с ' + chat.name);
+    }
+    if (data.status === 'ended') endActiveCall(false);
+  });
+  activeCall.unsubCandidates = onSnapshot(answerCandidatesRef, (snap) => {
+    snap.docChanges().forEach(change => {
+      if (change.type === 'added') pc.addIceCandidate(new RTCIceCandidate(change.doc.data())).catch(() => {});
+    });
+  });
+}
+
+async function acceptCall() {
+  if (!pendingIncomingCall) return;
+  const { chat, data: callData } = pendingIncomingCall;
+  let localStream;
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (e) {
+    alert('Не удалось получить доступ к микрофону: ' + e.message);
+    declineCall();
+    return;
+  }
+
+  const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+  localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+  const remoteStream = new MediaStream();
+  pc.ontrack = (e) => { e.streams[0].getTracks().forEach(t => remoteStream.addTrack(t)); playRemoteStream(remoteStream); };
+
+  activeCall = { chat, pc, localStream, role: 'callee' };
+
+  const callDocRef = doc(db, 'calls', chat.roomId);
+  const offerCandidatesRef = collection(db, 'calls', chat.roomId, 'offerCandidates');
+  const answerCandidatesRef = collection(db, 'calls', chat.roomId, 'answerCandidates');
+
+  pc.onicecandidate = (e) => { if (e.candidate) addDoc(answerCandidatesRef, e.candidate.toJSON()); };
+
+  await pc.setRemoteDescription(new RTCSessionDescription(callData.offer));
+  const answerDesc = await pc.createAnswer();
+  await pc.setLocalDescription(answerDesc);
+  await setDoc(callDocRef, {
+    answer: { sdp: answerDesc.sdp, type: answerDesc.type },
+    status: 'active',
+  }, { merge: true });
+
+  hideIncomingCallOverlay();
+  showCallBar('В звонке с ' + chat.name);
+
+  activeCall.unsubDoc = onSnapshot(callDocRef, (snap) => {
+    const data = snap.data();
+    if (data && data.status === 'ended') endActiveCall(false);
+  });
+  activeCall.unsubCandidates = onSnapshot(offerCandidatesRef, (snap) => {
+    snap.docChanges().forEach(change => {
+      if (change.type === 'added') pc.addIceCandidate(new RTCIceCandidate(change.doc.data())).catch(() => {});
+    });
+  });
+}
+
+function declineCall() {
+  if (!pendingIncomingCall) return;
+  const { chat } = pendingIncomingCall;
+  setDoc(doc(db, 'calls', chat.roomId), { status: 'ended' }, { merge: true }).catch(() => {});
+  hideIncomingCallOverlay();
+}
+
+function endActiveCall(userInitiated) {
+  if (!activeCall) return;
+  const { pc, localStream, chat, unsubDoc, unsubCandidates } = activeCall;
+  if (unsubDoc) unsubDoc();
+  if (unsubCandidates) unsubCandidates();
+  try { pc.close(); } catch (e) {}
+  localStream.getTracks().forEach(t => t.stop());
+  hideCallBar();
+  hideIncomingCallOverlay();
+  if (userInitiated) {
+    setDoc(doc(db, 'calls', chat.roomId), { status: 'ended' }, { merge: true }).catch(() => {});
+  }
+  activeCall = null;
+}
+
+callBtn.addEventListener('click', () => {
+  const chat = chats.find(c => c.id === activeChatId);
+  if (chat && chat.isAccount && !chat.locked) startCall(chat);
+});
+document.getElementById('incoming-call-accept').addEventListener('click', acceptCall);
+document.getElementById('incoming-call-decline').addEventListener('click', declineCall);
+document.getElementById('call-hangup-btn').addEventListener('click', () => endActiveCall(true));
 
 /* ======================================================================
    INIT
    ====================================================================== */
 renderChatList();
-openChat('live');
+openChat('manual');
 appEl.classList.remove('chat-open'); // stay on chat list first on mobile until user taps it
 // Try to init Firebase silently on load (won't connect until user hits "Connect")
 initFirebase();
